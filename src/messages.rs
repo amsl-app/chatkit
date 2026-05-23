@@ -293,9 +293,11 @@ impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCalls> for Tool
             async_openai::types::chat::ChatCompletionMessageToolCalls::Function(tool_call) => {
                 tool_call.try_into()
             }
-            async_openai::types::chat::ChatCompletionMessageToolCalls::Custom(_) => Err(
-                ChatKitError::UnexpectedResponseFormat("Custom tool calls are not supported".into()),
-            ),
+            async_openai::types::chat::ChatCompletionMessageToolCalls::Custom(_) => {
+                Err(ChatKitError::UnexpectedResponseFormat(
+                    "Custom tool calls are not supported".into(),
+                ))
+            }
         }
     }
 }
