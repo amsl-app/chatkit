@@ -85,6 +85,10 @@ impl TryFrom<ToolSchema> for async_openai::types::chat::ChatCompletionTools {
     }
 }
 
+pub trait AsOpenApiField<'a> {
+    fn openapi_field(&'a self) -> OpenApiField<'a>;
+}
+
 /// Manual tool schema builder — alternative to `#[derive(JsonSchema)]` when you need runtime control.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

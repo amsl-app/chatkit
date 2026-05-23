@@ -11,7 +11,10 @@ metrics = ["dep:metrics"]
 
 [dependencies]
 metrics = { version = "0.24", optional = true }
-async-openai = { version = "0.40.2", features = ["chat-completion", "middleware"] }
+async-openai = { version = "0.40.2", features = [
+    "chat-completion",
+    "middleware",
+] }
 async-stream = "0.3.6"
 futures = "0.3.32"
 futures-retry-policies = "0.3.1"
