@@ -31,6 +31,7 @@ impl From<ToolChoice> for async_openai::types::chat::ChatCompletionToolChoiceOpt
     }
 }
 
+/// JSON Schema wrapper that maps to an OpenAI function tool.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ToolSchema(pub Schema);
 
@@ -84,6 +85,7 @@ impl TryFrom<ToolSchema> for async_openai::types::chat::ChatCompletionTools {
     }
 }
 
+/// Manual tool schema builder — alternative to `#[derive(JsonSchema)]` when you need runtime control.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenApiField<'a> {
@@ -113,10 +115,6 @@ impl<'a> From<OpenApiField<'a>> for ToolSchema {
             serde_json::from_value(value).expect("Deserialization failed that should not fail"),
         )
     }
-}
-
-pub trait AsOpenApiField<'a> {
-    fn openapi_field(&'a self) -> OpenApiField<'a>;
 }
 
 impl<'a> OpenApiField<'a> {

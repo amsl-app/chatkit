@@ -151,6 +151,17 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
                 tools: tool_calls,
                 tokens,
             })
+        } else if let Some(refusal) = first.message.refusal {
+            Ok(AssistantMessage {
+                name: None,
+                text: Some(TextContent {
+                    text: None,
+                    thinking: None,
+                    refusal: Some(refusal),
+                    }),
+                tools: Vec::new(),
+                tokens,
+            })
         } else if let Some(content) = first.message.content {
             let (thinking, text) = extract_thinking(&content);
 
@@ -170,7 +181,11 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
             );
             Ok(AssistantMessage {
                 name: None,
-                text: Some(TextContent { text, thinking }),
+                text: Some(TextContent {
+                    text,
+                    thinking,
+                    refusal: None,
+                }),
                 tools: Vec::new(),
                 tokens,
             })
@@ -183,7 +198,9 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
 #[derive(Debug, Clone)]
 pub struct TextContent {
     pub text: Option<String>,
+    /// Extracted from `<think>…</think>` tags in the model output.
     pub thinking: Option<String>,
+    pub refusal: Option<String>,
 }
 
 #[derive(Debug, Clone)]

@@ -16,9 +16,10 @@ pub mod messages;
 pub mod tools;
 pub mod types;
 
-pub static THINKING_RE: LazyLock<Regex> =
+pub(crate) static THINKING_RE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"(?s)<think>(.*?)</think>").expect("thinking regex is invalid"));
 
+/// Makes a single LLM call, returning either a complete message or a stream depending on `options.streaming`.
 #[instrument(skip(config))]
 pub async fn llm_call(
     config: CallConfig,
@@ -141,6 +142,7 @@ pub async fn llm_call(
     }
 }
 
+/// Forces the LLM to return structured output of type `T` by registering it as a required tool call.
 #[instrument(skip(config), err)]
 pub async fn llm_single_tool_call<T: DeserializeOwned + JsonSchema>(
     config: CallConfig,

@@ -18,19 +18,21 @@ use tokio::sync::Mutex;
 use tokio::time::Instant;
 use typed_builder::TypedBuilder;
 
-pub const ORGANIZATION_HEADER: &str = "OpenAI-Organization";
-pub const PROJECT_HEADER: &str = "OpenAI-Project";
-pub const BETA_HEADER: &str = "OpenAI-Beta";
+pub(crate) const ORGANIZATION_HEADER: &str = "OpenAI-Organization";
+pub(crate) const PROJECT_HEADER: &str = "OpenAI-Project";
 
 /// Request Types
-pub const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
+pub(crate) const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
 
-pub const DEFAULT_MODEL: &str = "gpt-5.4-mini";
+pub(crate) const DEFAULT_MODEL: &str = "gpt-5.4-mini";
 
+/// Connection and timeout settings for an LLM API endpoint.
 #[derive(TypedBuilder, Debug, Clone, Deserialize)]
 pub struct CallConfig {
+    /// Covers the full request lifecycle including retries.
     #[builder(default = Duration::from_secs(30))]
     pub total_timeout: Duration,
+    /// Per-attempt limit; for streaming, only applies to the initial connection.
     #[builder(default = Duration::from_secs(20))]
     pub iteration_timeout: Duration,
     #[builder(default = DEFAULT_API_BASE.into())]
@@ -156,6 +158,7 @@ impl LLMKitResponse {
 
 type BoxedStream = Pin<Box<dyn Stream<Item = Result<AssistantMessage, StreamingError>> + Send>>;
 
+/// Clonable handle to a streaming LLM response; the inner stream is shared via `Arc<Mutex>`.
 pub struct StreamResponse(Arc<Mutex<BoxedStream>>);
 
 impl StreamResponse {
@@ -243,6 +246,13 @@ pub(crate) fn process_stream(
                         tools: tool_calls,
                         tokens,
                     }
+                } else if let Some(refusal) = first.delta.refusal {
+                    yield AssistantMessage {
+                        name: None,
+                        text: Some(TextContent { text: None, thinking: None, refusal: Some(refusal) }),
+                        tools: Vec::new(),
+                        tokens,
+                    }
                 } else if let Some(content) = first.delta.content {
                     buffer.push_str(&content);
 
@@ -256,7 +266,7 @@ pub(crate) fn process_stream(
                                 if let Some(text) = reject_empty(text) {
                                     yield AssistantMessage {
                                         name: None,
-                                        text: Some(TextContent { text: Some(text), thinking: None }),
+                                        text: Some(TextContent { text: Some(text), thinking: None, refusal: None }),
                                         tools: Vec::new(),
                                         tokens: None,
                                     }
@@ -273,7 +283,7 @@ pub(crate) fn process_stream(
                                         if let Some(text) = reject_empty(to_yield) {
                                              yield AssistantMessage {
                                                 name: None,
-                                                text: Some(TextContent { text: Some(text), thinking: None }),
+                                                text: Some(TextContent { text: Some(text), thinking: None, refusal: None }),
                                                 tools: Vec::new(),
                                                 tokens: None,
                                             }
@@ -287,7 +297,7 @@ pub(crate) fn process_stream(
                                 if let Some(text) = reject_empty(to_yield) {
                                     yield AssistantMessage {
                                         name: None,
-                                        text: Some(TextContent { text: Some(text), thinking: None }),
+                                        text: Some(TextContent { text: Some(text), thinking: None, refusal: None }),
                                         tools: Vec::new(),
                                         tokens: None,
                                     }
@@ -303,7 +313,7 @@ pub(crate) fn process_stream(
 
                             yield AssistantMessage {
                                 name: None,
-                                text: Some(TextContent { text: None, thinking }),
+                                text: Some(TextContent { text: None, thinking, refusal: None }),
                                 tools: Vec::new(),
                                 tokens: None,
                             }
@@ -318,7 +328,7 @@ pub(crate) fn process_stream(
                                     if let Some(thinking) = reject_empty(to_yield) {
                                          yield AssistantMessage {
                                             name: None,
-                                            text: Some(TextContent { text: None, thinking: Some(thinking) }),
+                                            text: Some(TextContent { text: None, thinking: Some(thinking), refusal: None }),
                                             tools: Vec::new(),
                                             tokens: None,
                                         }
@@ -332,7 +342,7 @@ pub(crate) fn process_stream(
                             if let Some(thinking) = reject_empty(to_yield) {
                                 yield AssistantMessage {
                                     name: None,
-                                    text: Some(TextContent { text: None, thinking: Some(thinking) }),
+                                    text: Some(TextContent { text: None, thinking: Some(thinking), refusal: None }),
                                     tools: Vec::new(),
                                     tokens: None,
                                 }
