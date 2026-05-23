@@ -3,7 +3,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{THINKING_RE, error::LLMKitError};
+use crate::{THINKING_RE, error::ChatKitError};
 
 pub(crate) fn reject_empty(data: String) -> Option<String> {
     if data.is_empty() { None } else { Some(data) }
@@ -65,15 +65,15 @@ pub struct AssistantMessage {
 }
 
 impl AssistantMessage {
-    pub fn expect_text(self) -> Result<TextContent, LLMKitError> {
+    pub fn expect_text(self) -> Result<TextContent, ChatKitError> {
         self.text.ok_or_else(|| {
-            LLMKitError::UnexpectedResponseFormat("expected text content, got tool calls".into())
+            ChatKitError::UnexpectedResponseFormat("expected text content, got tool calls".into())
         })
     }
 
-    pub fn expect_tools(self) -> Result<Vec<ToolContent>, LLMKitError> {
+    pub fn expect_tools(self) -> Result<Vec<ToolContent>, ChatKitError> {
         if self.tools.is_empty() {
-            Err(LLMKitError::UnexpectedResponseFormat(
+            Err(ChatKitError::UnexpectedResponseFormat(
                 "expected tool calls, got text content".into(),
             ))
         } else {
@@ -85,7 +85,7 @@ impl AssistantMessage {
 impl TryFrom<AssistantMessage>
     for async_openai::types::chat::ChatCompletionRequestAssistantMessage
 {
-    type Error = LLMKitError;
+    type Error = ChatKitError;
 
     fn try_from(value: AssistantMessage) -> Result<Self, Self::Error> {
         let content: Option<
@@ -104,7 +104,7 @@ impl TryFrom<AssistantMessage>
                         .tools
                         .into_iter()
                         .map(TryInto::try_into)
-                        .collect::<Result<_, LLMKitError>>()?,
+                        .collect::<Result<_, ChatKitError>>()?,
                 )
             };
 
@@ -123,7 +123,7 @@ impl TryFrom<AssistantMessage>
 }
 
 impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for AssistantMessage {
-    type Error = LLMKitError;
+    type Error = ChatKitError;
 
     fn try_from(
         value: async_openai::types::chat::CreateChatCompletionResponse,
@@ -138,7 +138,7 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
             .choices
             .into_iter()
             .next()
-            .ok_or(LLMKitError::EmptyResponse)?;
+            .ok_or(ChatKitError::EmptyResponse)?;
 
         if let Some(tool_calls) = first.message.tool_calls {
             let tool_calls: Vec<ToolContent> = tool_calls
@@ -191,7 +191,7 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
                 tokens,
             })
         } else {
-            Err(LLMKitError::EmptyResponse)
+            Err(ChatKitError::EmptyResponse)
         }
     }
 }
@@ -220,7 +220,7 @@ pub struct ToolContent {
 }
 
 impl TryFrom<ToolContent> for async_openai::types::chat::ChatCompletionMessageToolCall {
-    type Error = LLMKitError;
+    type Error = ChatKitError;
 
     fn try_from(value: ToolContent) -> Result<Self, Self::Error> {
         Ok(async_openai::types::chat::ChatCompletionMessageToolCall {
@@ -234,7 +234,7 @@ impl TryFrom<ToolContent> for async_openai::types::chat::ChatCompletionMessageTo
 }
 
 impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCall> for ToolContent {
-    type Error = LLMKitError;
+    type Error = ChatKitError;
 
     fn try_from(
         value: async_openai::types::chat::ChatCompletionMessageToolCall,
@@ -264,7 +264,7 @@ impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCall> for ToolC
 }
 
 impl TryFrom<ToolContent> for async_openai::types::chat::ChatCompletionMessageToolCalls {
-    type Error = LLMKitError;
+    type Error = ChatKitError;
 
     fn try_from(value: ToolContent) -> Result<Self, Self::Error> {
         let function = value.try_into()?;
@@ -273,7 +273,7 @@ impl TryFrom<ToolContent> for async_openai::types::chat::ChatCompletionMessageTo
 }
 
 impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCalls> for ToolContent {
-    type Error = LLMKitError;
+    type Error = ChatKitError;
 
     fn try_from(
         value: async_openai::types::chat::ChatCompletionMessageToolCalls,
@@ -283,7 +283,7 @@ impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCalls> for Tool
                 tool_call.try_into()
             }
             async_openai::types::chat::ChatCompletionMessageToolCalls::Custom(_) => Err(
-                LLMKitError::UnexpectedResponseFormat("Custom tool calls are not supported".into()),
+                ChatKitError::UnexpectedResponseFormat("Custom tool calls are not supported".into()),
             ),
         }
     }
@@ -307,30 +307,30 @@ impl From<ToolMessage> for async_openai::types::chat::ChatCompletionRequestToolM
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum LLMKitMessage {
+pub enum ChatKitMessage {
     System(SystemMessage),
     User(UserMessage),
     Assistant(AssistantMessage),
     Tool(ToolMessage),
 }
 
-impl TryInto<async_openai::types::chat::ChatCompletionRequestMessage> for LLMKitMessage {
-    type Error = LLMKitError;
+impl TryInto<async_openai::types::chat::ChatCompletionRequestMessage> for ChatKitMessage {
+    type Error = ChatKitError;
 
     fn try_into(
         self,
     ) -> Result<async_openai::types::chat::ChatCompletionRequestMessage, Self::Error> {
         match self {
-            LLMKitMessage::System(msg) => {
+            ChatKitMessage::System(msg) => {
                 Ok(async_openai::types::chat::ChatCompletionRequestMessage::System(msg.into()))
             }
-            LLMKitMessage::User(msg) => {
+            ChatKitMessage::User(msg) => {
                 Ok(async_openai::types::chat::ChatCompletionRequestMessage::User(msg.into()))
             }
-            LLMKitMessage::Assistant(msg) => Ok(
+            ChatKitMessage::Assistant(msg) => Ok(
                 async_openai::types::chat::ChatCompletionRequestMessage::Assistant(msg.try_into()?),
             ),
-            LLMKitMessage::Tool(msg) => {
+            ChatKitMessage::Tool(msg) => {
                 Ok(async_openai::types::chat::ChatCompletionRequestMessage::Tool(msg.into()))
             }
         }
@@ -338,17 +338,17 @@ impl TryInto<async_openai::types::chat::ChatCompletionRequestMessage> for LLMKit
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Memory(pub Vec<LLMKitMessage>);
+pub struct Memory(pub Vec<ChatKitMessage>);
 
 impl TryFrom<Memory> for Vec<async_openai::types::chat::ChatCompletionRequestMessage> {
-    type Error = LLMKitError;
+    type Error = ChatKitError;
 
     fn try_from(value: Memory) -> Result<Self, Self::Error> {
         value
             .0
             .into_iter()
             .map(TryInto::try_into)
-            .collect::<Result<_, LLMKitError>>()
+            .collect::<Result<_, ChatKitError>>()
     }
 }
 

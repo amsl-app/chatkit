@@ -1,6 +1,6 @@
-use llmkit::{
+use chatkit::{
     llm_call,
-    messages::{LLMKitMessage, Memory, UserMessage},
+    messages::{ChatKitMessage, Memory, UserMessage},
     types::{CallConfig, CallOptions},
 };
 
@@ -16,7 +16,7 @@ async fn main() {
         .streaming(true)
         .build();
 
-    let memory = Memory(vec![LLMKitMessage::User(UserMessage {
+    let memory = Memory(vec![ChatKitMessage::User(UserMessage {
         name: None,
         content: "Count from 1 to 5, one number per line.".into(),
     })]);

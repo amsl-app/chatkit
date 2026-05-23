@@ -1,7 +1,7 @@
-use crate::error::{LLMKitError, ToolCallError};
+use crate::error::{ChatKitError, ToolCallError};
 use crate::messages::{AssistantMessage, Memory, TokenUsage, ToolContent};
 use crate::tools::{ToolChoice, ToolSchema};
-use crate::types::{CallConfig, CallOptions, LLMKitResponse, StreamResponse, process_stream};
+use crate::types::{CallConfig, CallOptions, ChatKitResponse, StreamResponse, process_stream};
 
 use regex::Regex;
 use schemars::JsonSchema;
@@ -27,7 +27,7 @@ pub async fn llm_call(
     memory: Memory,
     tools: Vec<ToolSchema>,
     tool_choice: Option<ToolChoice>,
-) -> Result<LLMKitResponse, LLMKitError> {
+) -> Result<ChatKitResponse, ChatKitError> {
     let CallOptions {
         model,
         temperature,
@@ -90,7 +90,7 @@ pub async fn llm_call(
             error = &error as &dyn Error,
             "failed to build http client for llm call"
         );
-        LLMKitError::HttpClientBuild(error)
+        ChatKitError::HttpClientBuild(error)
     })?;
 
     let http_service = tower::ServiceBuilder::new()
@@ -107,9 +107,9 @@ pub async fn llm_call(
         match res {
             Ok(stream) => {
                 let stream = process_stream(stream, start_time, service, model);
-                Ok(LLMKitResponse::Stream(StreamResponse::new(stream)))
+                Ok(ChatKitResponse::Stream(StreamResponse::new(stream)))
             }
-            Err(error) => Err(LLMKitError::Api(error)),
+            Err(error) => Err(ChatKitError::Api(error)),
         }
     } else {
         let res: Result<
@@ -134,11 +134,11 @@ pub async fn llm_call(
         tracing::debug!(?res, "received LLM response");
         let chat_completion = res.map_err(|error| {
             tracing::warn!(error = &error as &dyn Error, "LLM call failed");
-            LLMKitError::Api(error)
+            ChatKitError::Api(error)
         })?;
 
         let message: AssistantMessage = chat_completion.try_into()?;
-        Ok(LLMKitResponse::Message(message))
+        Ok(ChatKitResponse::Message(message))
     }
 }
 
@@ -148,12 +148,12 @@ pub async fn llm_single_tool_call<T: DeserializeOwned + JsonSchema>(
     config: CallConfig,
     options: CallOptions,
     memory: Memory,
-) -> Result<(T, Option<TokenUsage>), LLMKitError> {
+) -> Result<(T, Option<TokenUsage>), ChatKitError> {
     let schema = schemars::schema_for!(T);
     let tool_schema: ToolSchema = schema.into();
     let tool_name = tool_schema
         .name()
-        .ok_or(LLMKitError::ToolCall(ToolCallError::InvalidSchema(
+        .ok_or(ChatKitError::ToolCall(ToolCallError::InvalidSchema(
             "Missing title in schema".to_string(),
         )))?
         .to_string();
@@ -167,8 +167,8 @@ pub async fn llm_single_tool_call<T: DeserializeOwned + JsonSchema>(
     )
     .await?;
 
-    let LLMKitResponse::Message(llm_response) = llm_response else {
-        return Err(LLMKitError::UnexpectedResponseFormat(
+    let ChatKitResponse::Message(llm_response) = llm_response else {
+        return Err(ChatKitError::UnexpectedResponseFormat(
             "Expected non-streaming response for single tool call".to_string(),
         ));
     };
@@ -177,7 +177,7 @@ pub async fn llm_single_tool_call<T: DeserializeOwned + JsonSchema>(
         llm_response.tools.into_iter().find(|t| t.name == tool_name);
 
     let tool_response =
-        tool_response.ok_or_else(|| LLMKitError::ToolCall(ToolCallError::Missing))?;
+        tool_response.ok_or_else(|| ChatKitError::ToolCall(ToolCallError::Missing))?;
 
     let res: T = serde_json::from_value(tool_response.arguments)?;
     Ok((res, llm_response.tokens))

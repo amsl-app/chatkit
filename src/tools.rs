@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use crate::error::{LLMKitError, ToolCallError};
+use crate::error::{ChatKitError, ToolCallError};
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash)]
 pub enum ToolChoice {
@@ -49,26 +49,26 @@ impl From<Schema> for ToolSchema {
 }
 
 impl TryFrom<ToolSchema> for async_openai::types::chat::ChatCompletionTools {
-    type Error = LLMKitError;
+    type Error = ChatKitError;
 
     fn try_from(
         schema: ToolSchema,
     ) -> Result<async_openai::types::chat::ChatCompletionTools, Self::Error> {
-        let mut properties = schema.0.as_object().cloned().ok_or(LLMKitError::ToolCall(
+        let mut properties = schema.0.as_object().cloned().ok_or(ChatKitError::ToolCall(
             ToolCallError::InvalidSchema("Schema is not an object".to_string()),
         ))?;
 
         let title = properties
             .remove("title")
             .and_then(|t| t.as_str().map(ToString::to_string))
-            .ok_or(LLMKitError::ToolCall(ToolCallError::InvalidSchema(
+            .ok_or(ChatKitError::ToolCall(ToolCallError::InvalidSchema(
                 "Missing title in schema".to_string(),
             )))?;
 
         let description = properties
             .remove("description")
             .and_then(|d| d.as_str().map(ToString::to_string))
-            .ok_or(LLMKitError::ToolCall(ToolCallError::InvalidSchema(
+            .ok_or(ChatKitError::ToolCall(ToolCallError::InvalidSchema(
                 "Missing description in schema".to_string(),
             )))?;
 

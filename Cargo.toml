@@ -1,7 +1,10 @@
 [package]
-name = "llmkit"
+name = "chatkit"
 version = "0.1.0"
 edition = "2024"
+description = "Thin async Rust wrapper around any OpenAI-compatible chat API with streaming, tool calling, and structured output support."
+license = "MIT"
+repository = "https://github.com/amsl-app/chatkit"
 
 [features]
 metrics = ["dep:metrics"]
@@ -25,7 +28,6 @@ tokio = "1.52.3"
 tower = "0.5.3"
 tracing = "0.1.44"
 typed-builder = "0.23.2"
-dotenvy = "0.15.7"
-
 [dev-dependencies]
 tokio = { version = "1.52.3", features = ["macros", "rt"] }
+dotenvy = "0.15.7"

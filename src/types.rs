@@ -1,4 +1,4 @@
-use crate::error::{LLMKitError, StreamingError, ToolCallError};
+use crate::error::{ChatKitError, StreamingError, ToolCallError};
 use crate::messages::{
     AssistantMessage, TextContent, TokenUsage, ToolContent, extract_thinking, reject_empty,
 };
@@ -132,25 +132,25 @@ pub struct CallOptions {
 /// Response Types
 
 #[derive(Debug, Clone)]
-pub enum LLMKitResponse {
+pub enum ChatKitResponse {
     Message(AssistantMessage),
     Stream(StreamResponse),
 }
 
-impl LLMKitResponse {
-    pub fn expect_message(self) -> Result<AssistantMessage, LLMKitError> {
+impl ChatKitResponse {
+    pub fn expect_message(self) -> Result<AssistantMessage, ChatKitError> {
         match self {
-            LLMKitResponse::Message(msg) => Ok(msg),
-            LLMKitResponse::Stream(_) => Err(LLMKitError::UnexpectedResponseFormat(
+            ChatKitResponse::Message(msg) => Ok(msg),
+            ChatKitResponse::Stream(_) => Err(ChatKitError::UnexpectedResponseFormat(
                 "expected message response, got stream".into(),
             )),
         }
     }
 
-    pub fn expect_stream(self) -> Result<StreamResponse, LLMKitError> {
+    pub fn expect_stream(self) -> Result<StreamResponse, ChatKitError> {
         match self {
-            LLMKitResponse::Stream(stream) => Ok(stream),
-            LLMKitResponse::Message(_) => Err(LLMKitError::UnexpectedResponseFormat(
+            ChatKitResponse::Stream(stream) => Ok(stream),
+            ChatKitResponse::Message(_) => Err(ChatKitError::UnexpectedResponseFormat(
                 "expected stream response, got message".into(),
             )),
         }
@@ -372,7 +372,7 @@ pub(crate) fn process_stream(
 fn process_tool_call_chunk(
     previous_id: Option<String>,
     value: async_openai::types::chat::ChatCompletionMessageToolCallChunk,
-) -> Result<ToolContent, LLMKitError> {
+) -> Result<ToolContent, ChatKitError> {
     let async_openai::types::chat::ChatCompletionMessageToolCallChunk { id, function, .. } = value;
 
     if let Some(async_openai::types::chat::FunctionCallStream {
@@ -387,7 +387,7 @@ fn process_tool_call_chunk(
 
         let id = id
             .or(previous_id)
-            .ok_or(LLMKitError::ToolCall(ToolCallError::MissingToolId))?;
+            .ok_or(ChatKitError::ToolCall(ToolCallError::MissingToolId))?;
 
         Ok(ToolContent {
             id,
@@ -396,7 +396,7 @@ fn process_tool_call_chunk(
             arguments,
         })
     } else {
-        Err(LLMKitError::EmptyResponse)
+        Err(ChatKitError::EmptyResponse)
     }
 }
 

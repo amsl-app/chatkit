@@ -1,4 +1,4 @@
-# llmkit
+# chatkit
 
 Thin async Rust wrapper around any OpenAI-compatible chat API with streaming, tool calling, and structured output support.
 
@@ -14,19 +14,19 @@ Thin async Rust wrapper around any OpenAI-compatible chat API with streaming, to
 
 ```toml
 [dependencies]
-llmkit = { path = "." }
+chatkit = "0.1.0"
 tokio = { version = "1", features = ["macros", "rt-current-thread"] }
 ```
 
 ### Simple chat
 
 ```rust
-use llmkit::{llm_call, messages::{LLMKitMessage, Memory, SystemMessage, UserMessage}, types::{CallConfig, CallOptions}};
+use chatkit::{llm_call, messages::{ChatKitMessage, Memory, SystemMessage, UserMessage}, types::{CallConfig, CallOptions}};
 
 let config = CallConfig::builder().api_key(api_key.into()).build();
 let options = CallOptions::builder().model("gpt-4o-mini".into()).build();
 let memory = Memory(vec![
-    LLMKitMessage::User(UserMessage { name: None, content: "Hello!".into() }),
+    ChatKitMessage::User(UserMessage { name: None, content: "Hello!".into() }),
 ]);
 
 let msg = llm_call(config, options, memory, vec![], None)
@@ -38,7 +38,7 @@ println!("{}", msg.text.unwrap().text.unwrap_or_default());
 ### Structured output
 
 ```rust
-use llmkit::llm_single_tool_call;
+use chatkit::llm_single_tool_call;
 use schemars::JsonSchema;
 use serde::Deserialize;
 
@@ -61,8 +61,8 @@ println!("{} ({:.0}%)", result.sentiment, result.confidence * 100.0);
 |---|---|
 | `CallConfig` | API endpoint, key, and timeouts (builder pattern) |
 | `CallOptions` | Model, temperature, streaming, reasoning effort |
-| `Memory` | Ordered list of `LLMKitMessage`s (conversation history) |
-| `LLMKitResponse` | Either `Message(AssistantMessage)` or `Stream(StreamResponse)` |
+| `Memory` | Ordered list of `ChatKitMessage`s (conversation history) |
+| `ChatKitResponse` | Either `Message(AssistantMessage)` or `Stream(StreamResponse)` |
 | `ToolSchema` | JSON Schema → OpenAI function tool (via `schemars` or `OpenApiField`) |
 
 ## Examples
@@ -76,7 +76,7 @@ OPENAI_API_KEY=sk-... cargo run --example streaming
 ## Features
 
 ```toml
-llmkit = { path = ".", features = ["metrics"] }
+chatkit = { version = "0.1.0", features = ["metrics"] }
 ```
 
 Enables `metrics` histograms: `llm_time_to_first_token_ms` and `llm_time_to_last_token_ms`, tagged with `service` and `model`.

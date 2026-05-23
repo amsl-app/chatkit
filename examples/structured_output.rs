@@ -1,6 +1,6 @@
-use llmkit::{
+use chatkit::{
     llm_single_tool_call,
-    messages::{LLMKitMessage, Memory, SystemMessage, UserMessage},
+    messages::{ChatKitMessage, Memory, SystemMessage, UserMessage},
     types::{CallConfig, CallOptions},
 };
 use schemars::JsonSchema;
@@ -29,11 +29,11 @@ async fn main() {
     let text = "I absolutely loved the movie! The acting was superb and the story kept me engaged throughout.";
 
     let memory = Memory(vec![
-        LLMKitMessage::System(SystemMessage {
+        ChatKitMessage::System(SystemMessage {
             name: None,
             content: "You are a sentiment analysis assistant.".into(),
         }),
-        LLMKitMessage::User(UserMessage {
+        ChatKitMessage::User(UserMessage {
             name: None,
             content: format!("Analyze the sentiment of this text: {text}"),
         }),

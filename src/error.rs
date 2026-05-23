@@ -18,7 +18,7 @@ pub enum ToolCallError {
 }
 
 #[derive(Debug, Error)]
-pub enum LLMKitError {
+pub enum ChatKitError {
     #[error(transparent)]
     Api(#[from] async_openai::error::OpenAIError),
 
@@ -41,7 +41,7 @@ pub enum LLMKitError {
     HttpClientBuild(#[from] reqwest::Error),
 }
 
-impl ShouldRetry for LLMKitError {
+impl ShouldRetry for ChatKitError {
     fn should_retry(&self, _: u32) -> bool {
         true
     }

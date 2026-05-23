@@ -1,6 +1,6 @@
-use llmkit::{
+use chatkit::{
     llm_call,
-    messages::{LLMKitMessage, Memory, SystemMessage, UserMessage},
+    messages::{ChatKitMessage, Memory, SystemMessage, UserMessage},
     types::{CallConfig, CallOptions},
 };
 
@@ -14,11 +14,11 @@ async fn main() {
     let options = CallOptions::builder().model("gpt-4o-mini".into()).build();
 
     let memory = Memory(vec![
-        LLMKitMessage::System(SystemMessage {
+        ChatKitMessage::System(SystemMessage {
             name: None,
             content: "You are a concise assistant.".into(),
         }),
-        LLMKitMessage::User(UserMessage {
+        ChatKitMessage::User(UserMessage {
             name: None,
             content: "What is the capital of France?".into(),
         }),
