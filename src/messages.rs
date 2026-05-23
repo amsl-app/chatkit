@@ -63,6 +63,24 @@ pub struct AssistantMessage {
     pub tokens: Option<TokenUsage>,
 }
 
+impl AssistantMessage {
+    pub fn expect_text(self) -> Result<TextContent, LLMKitError> {
+        self.text.ok_or_else(|| {
+            LLMKitError::UnexpectedResponseFormat("expected text content, got tool calls".into())
+        })
+    }
+
+    pub fn expect_tools(self) -> Result<Vec<ToolContent>, LLMKitError> {
+        if self.tools.is_empty() {
+            Err(LLMKitError::UnexpectedResponseFormat(
+                "expected tool calls, got text content".into(),
+            ))
+        } else {
+            Ok(self.tools)
+        }
+    }
+}
+
 impl TryFrom<AssistantMessage>
     for async_openai::types::chat::ChatCompletionRequestAssistantMessage
 {
@@ -302,7 +320,7 @@ impl TryInto<async_openai::types::chat::ChatCompletionRequestMessage> for LLMKit
 }
 
 #[derive(Debug, Clone)]
-pub struct Memory(Vec<LLMKitMessage>);
+pub struct Memory(pub Vec<LLMKitMessage>);
 
 impl TryFrom<Memory> for Vec<async_openai::types::chat::ChatCompletionRequestMessage> {
     type Error = LLMKitError;

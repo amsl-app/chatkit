@@ -41,6 +41,7 @@ pub struct CallConfig {
     pub org_id: String,
     #[builder(default)]
     pub project_id: String,
+    #[builder(default)]
     #[serde(skip)]
     pub custom_headers: HeaderMap,
 }
@@ -131,6 +132,26 @@ pub struct CallOptions {
 pub enum LLMKitResponse {
     Message(AssistantMessage),
     Stream(StreamResponse),
+}
+
+impl LLMKitResponse {
+    pub fn expect_message(self) -> Result<AssistantMessage, LLMKitError> {
+        match self {
+            LLMKitResponse::Message(msg) => Ok(msg),
+            LLMKitResponse::Stream(_) => Err(LLMKitError::UnexpectedResponseFormat(
+                "expected message response, got stream".into(),
+            )),
+        }
+    }
+
+    pub fn expect_stream(self) -> Result<StreamResponse, LLMKitError> {
+        match self {
+            LLMKitResponse::Stream(stream) => Ok(stream),
+            LLMKitResponse::Message(_) => Err(LLMKitError::UnexpectedResponseFormat(
+                "expected stream response, got message".into(),
+            )),
+        }
+    }
 }
 
 type BoxedStream = Pin<Box<dyn Stream<Item = Result<AssistantMessage, StreamingError>> + Send>>;
