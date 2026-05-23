@@ -3,7 +3,7 @@ name = "chatkit"
 version = "0.1.0"
 edition = "2024"
 description = "Thin async Rust wrapper around any OpenAI-compatible chat API with streaming, tool calling, and structured output support."
-license = "MIT"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/amsl-app/chatkit"
 
 [features]

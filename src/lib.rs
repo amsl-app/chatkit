@@ -40,8 +40,7 @@ pub async fn llm_call(
     let service = config.api_base.clone();
 
     let mut request = async_openai::types::chat::CreateChatCompletionRequestArgs::default();
-    let messages: Vec<async_openai::types::chat::ChatCompletionRequestMessage> =
-        memory.try_into()?;
+    let messages: Vec<async_openai::types::chat::ChatCompletionRequestMessage> = memory.try_into()?;
     request.model(&model).messages(messages);
 
     if let Some(temperature) = temperature {
@@ -52,10 +51,7 @@ pub async fn llm_call(
         request.reasoning_effort(reasoning_effort);
     }
 
-    let tools: Vec<_> = tools
-        .into_iter()
-        .map(TryInto::try_into)
-        .collect::<Result<_, _>>()?;
+    let tools: Vec<_> = tools.into_iter().map(TryInto::try_into).collect::<Result<_, _>>()?;
 
     if !tools.is_empty() {
         tracing::debug!(tool_count = tools.len(), "adding tools to LLM request");
@@ -86,10 +82,7 @@ pub async fn llm_call(
     }
 
     let http_client = http_client_builder.build().map_err(|error| {
-        tracing::error!(
-            error = &error as &dyn Error,
-            "failed to build http client for llm call"
-        );
+        tracing::error!(error = &error as &dyn Error, "failed to build http client for llm call");
         ChatKitError::HttpClientBuild(error)
     })?;
 
@@ -112,10 +105,8 @@ pub async fn llm_call(
             Err(error) => Err(ChatKitError::Api(error)),
         }
     } else {
-        let res: Result<
-            async_openai::types::chat::CreateChatCompletionResponse,
-            async_openai::error::OpenAIError,
-        > = client.chat().create(request).await;
+        let res: Result<async_openai::types::chat::CreateChatCompletionResponse, async_openai::error::OpenAIError> =
+            client.chat().create(request).await;
 
         #[cfg(feature = "metrics")]
         {
@@ -173,11 +164,9 @@ pub async fn llm_single_tool_call<T: DeserializeOwned + JsonSchema>(
         ));
     };
 
-    let tool_response: Option<ToolContent> =
-        llm_response.tools.into_iter().find(|t| t.name == tool_name);
+    let tool_response: Option<ToolContent> = llm_response.tools.into_iter().find(|t| t.name == tool_name);
 
-    let tool_response =
-        tool_response.ok_or_else(|| ChatKitError::ToolCall(ToolCallError::Missing))?;
+    let tool_response = tool_response.ok_or_else(|| ChatKitError::ToolCall(ToolCallError::Missing))?;
 
     let res: T = serde_json::from_value(tool_response.arguments)?;
     Ok((res, llm_response.tokens))

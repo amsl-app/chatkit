@@ -20,13 +20,11 @@ impl From<ToolChoice> for async_openai::types::chat::ChatCompletionToolChoiceOpt
             ToolChoice::Auto => async_openai::types::chat::ChatCompletionToolChoiceOption::Mode(
                 async_openai::types::chat::ToolChoiceOptions::Auto,
             ),
-            ToolChoice::Named(name) => {
-                async_openai::types::chat::ChatCompletionToolChoiceOption::Function(
-                    async_openai::types::chat::ChatCompletionNamedToolChoice {
-                        function: async_openai::types::chat::FunctionName { name },
-                    },
-                )
-            } // ToolChoice::Required => ChatCompletionToolChoiceOption::Mode(ToolChoiceOptions::Required),
+            ToolChoice::Named(name) => async_openai::types::chat::ChatCompletionToolChoiceOption::Function(
+                async_openai::types::chat::ChatCompletionNamedToolChoice {
+                    function: async_openai::types::chat::FunctionName { name },
+                },
+            ), // ToolChoice::Required => ChatCompletionToolChoiceOption::Mode(ToolChoiceOptions::Required),
         }
     }
 }
@@ -51,12 +49,15 @@ impl From<Schema> for ToolSchema {
 impl TryFrom<ToolSchema> for async_openai::types::chat::ChatCompletionTools {
     type Error = ChatKitError;
 
-    fn try_from(
-        schema: ToolSchema,
-    ) -> Result<async_openai::types::chat::ChatCompletionTools, Self::Error> {
-        let mut properties = schema.0.as_object().cloned().ok_or(ChatKitError::ToolCall(
-            ToolCallError::InvalidSchema("Schema is not an object".to_string()),
-        ))?;
+    fn try_from(schema: ToolSchema) -> Result<async_openai::types::chat::ChatCompletionTools, Self::Error> {
+        let mut properties =
+            schema
+                .0
+                .as_object()
+                .cloned()
+                .ok_or(ChatKitError::ToolCall(ToolCallError::InvalidSchema(
+                    "Schema is not an object".to_string(),
+                )))?;
 
         let title = properties
             .remove("title")
@@ -115,9 +116,7 @@ pub struct OpenApiField<'a> {
 impl<'a> From<OpenApiField<'a>> for ToolSchema {
     fn from(field: OpenApiField<'a>) -> Self {
         let value = serde_json::to_value(field).expect("Serialization failed that should not fail");
-        ToolSchema(
-            serde_json::from_value(value).expect("Deserialization failed that should not fail"),
-        )
+        ToolSchema(serde_json::from_value(value).expect("Deserialization failed that should not fail"))
     }
 }
 
@@ -155,10 +154,7 @@ impl<'a> OpenApiField<'a> {
     }
 
     #[must_use]
-    pub fn properties<I: Into<HashMap<&'a str, OpenApiField<'a>>>>(
-        mut self,
-        properties: I,
-    ) -> Self {
+    pub fn properties<I: Into<HashMap<&'a str, OpenApiField<'a>>>>(mut self, properties: I) -> Self {
         self.properties = properties.into();
         self
     }
@@ -203,10 +199,7 @@ mod tests {
     #[test]
     fn test_as_llm_tool() {
         #[derive(JsonSchema, Serialize, Deserialize)]
-        #[schemars(
-            description = "An struct within an enum tool for demonstration purposes",
-            inline
-        )]
+        #[schemars(description = "An struct within an enum tool for demonstration purposes", inline)]
         pub struct EnumStruct {
             pub field: String,
         }
@@ -248,17 +241,10 @@ mod tests {
                     f.function.description.as_deref(),
                     Some("A test tool for demonstration purposes")
                 );
-                let params = f
-                    .function
-                    .parameters
-                    .as_ref()
-                    .expect("Parameters should exist");
+                let params = f.function.parameters.as_ref().expect("Parameters should exist");
                 assert_eq!(params["type"], "object");
                 assert_eq!(params["properties"]["name"]["type"], "string");
-                assert_eq!(
-                    params["properties"]["name"]["description"],
-                    "The name of the person"
-                );
+                assert_eq!(params["properties"]["name"]["description"], "The name of the person");
                 assert_eq!(params["properties"]["age"]["description"], "Optional age");
                 assert_eq!(
                     params["properties"]["enum_field"]["description"],
@@ -276,22 +262,15 @@ mod tests {
             .description("A manually defined tool schema")
             .properties(
                 vec![
-                    (
-                        "field1",
-                        OpenApiField::new("string").description("A string field"),
-                    ),
-                    (
-                        "field2",
-                        OpenApiField::new("number").description("A number field"),
-                    ),
+                    ("field1", OpenApiField::new("string").description("A string field")),
+                    ("field2", OpenApiField::new("number").description("A number field")),
                 ]
                 .into_iter()
                 .collect::<HashMap<&str, OpenApiField>>(),
             );
         let tool_schema: ToolSchema = schema.into();
-        let llm_tool: async_openai::types::chat::ChatCompletionTools = tool_schema
-            .try_into()
-            .expect("Failed to convert to LLM tool");
+        let llm_tool: async_openai::types::chat::ChatCompletionTools =
+            tool_schema.try_into().expect("Failed to convert to LLM tool");
         match llm_tool {
             async_openai::types::chat::ChatCompletionTools::Function(f) => {
                 assert_eq!(f.function.name, "MyManualTool");
@@ -299,22 +278,12 @@ mod tests {
                     f.function.description.as_deref(),
                     Some("A manually defined tool schema")
                 );
-                let params = f
-                    .function
-                    .parameters
-                    .as_ref()
-                    .expect("Parameters should exist");
+                let params = f.function.parameters.as_ref().expect("Parameters should exist");
                 assert_eq!(params["type"], "object");
                 assert_eq!(params["properties"]["field1"]["type"], "string");
-                assert_eq!(
-                    params["properties"]["field1"]["description"],
-                    "A string field"
-                );
+                assert_eq!(params["properties"]["field1"]["description"], "A string field");
                 assert_eq!(params["properties"]["field2"]["type"], "number");
-                assert_eq!(
-                    params["properties"]["field2"]["description"],
-                    "A number field"
-                );
+                assert_eq!(params["properties"]["field2"]["description"], "A number field");
             }
             _ => panic!("Expected Function tool"),
         }

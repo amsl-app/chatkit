@@ -1,7 +1,5 @@
 use crate::error::{ChatKitError, StreamingError, ToolCallError};
-use crate::messages::{
-    AssistantMessage, TextContent, TokenUsage, ToolContent, extract_thinking, reject_empty,
-};
+use crate::messages::{AssistantMessage, TextContent, TokenUsage, ToolContent, extract_thinking, reject_empty};
 use async_openai::config::Config;
 use async_stream::try_stream;
 use futures::{Stream, StreamExt};
@@ -192,10 +190,7 @@ impl Clone for StreamResponse {
 #[cfg_attr(not(feature = "metrics"), allow(unused_variables))]
 pub(crate) fn process_stream(
     mut stream: impl Stream<
-        Item = Result<
-            async_openai::types::chat::CreateChatCompletionStreamResponse,
-            async_openai::error::OpenAIError,
-        >,
+        Item = Result<async_openai::types::chat::CreateChatCompletionStreamResponse, async_openai::error::OpenAIError>,
     > + Unpin
     + Send
     + 'static,
@@ -406,9 +401,7 @@ fn process_tool_call_chunk(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_openai::types::chat::{
-        ChatCompletionMessageToolCallChunk, CreateChatCompletionStreamResponse,
-    };
+    use async_openai::types::chat::{ChatCompletionMessageToolCallChunk, CreateChatCompletionStreamResponse};
     use futures::{StreamExt, stream};
 
     #[tokio::test]
@@ -451,12 +444,7 @@ mod tests {
         ];
 
         let stream = stream::iter(chunks);
-        let mut processed = process_stream(
-            stream,
-            Instant::now(),
-            "test".to_string(),
-            "test".to_string(),
-        );
+        let mut processed = process_stream(stream, Instant::now(), "test".to_string(), "test".to_string());
 
         let msg1 = processed.next().await.unwrap().unwrap();
         let text1 = msg1.text.unwrap();
@@ -489,10 +477,7 @@ mod tests {
 
         let response = process_tool_call_chunk(None, chunk).unwrap();
         assert_eq!(response.name, "test_tool");
-        assert_eq!(
-            response.thinking,
-            Some("streaming tool thoughts".to_string())
-        );
+        assert_eq!(response.thinking, Some("streaming tool thoughts".to_string()));
         assert_eq!(response.arguments["arg"], "done");
     }
 }
