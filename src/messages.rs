@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -18,8 +19,9 @@ pub(crate) fn extract_thinking(s: &str) -> (Option<String>, String) {
 }
 /// System Message
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SystemMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub content: String,
 }
@@ -37,8 +39,9 @@ impl From<SystemMessage> for async_openai::types::chat::ChatCompletionRequestSys
 
 /// User Message
 ///
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct UserMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     pub content: String,
 }
@@ -56,11 +59,15 @@ impl From<UserMessage> for async_openai::types::chat::ChatCompletionRequestUserM
 
 /// Assistant Message
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AssistantMessage {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<TextContent>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tools: Vec<ToolContent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub tokens: Option<TokenUsage>,
 }
 
@@ -196,25 +203,29 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct TextContent {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub text: Option<String>,
     /// Extracted from `<think>…</think>` tags in the model output.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub refusal: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct TokenUsage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ToolContent {
     pub id: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub thinking: Option<String>,
     pub arguments: Value,
 }
@@ -289,7 +300,7 @@ impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCalls> for Tool
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ToolMessage {
     pub id: String,
     pub content: String,
@@ -306,7 +317,8 @@ impl From<ToolMessage> for async_openai::types::chat::ChatCompletionRequestToolM
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "role", content = "data")]
 pub enum ChatKitMessage {
     System(SystemMessage),
     User(UserMessage),
@@ -337,7 +349,7 @@ impl TryInto<async_openai::types::chat::ChatCompletionRequestMessage> for ChatKi
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Memory(pub Vec<ChatKitMessage>);
 
 impl TryFrom<Memory> for Vec<async_openai::types::chat::ChatCompletionRequestMessage> {

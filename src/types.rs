@@ -7,6 +7,7 @@ use async_stream::try_stream;
 use futures::{Stream, StreamExt};
 use reqwest::header::{AUTHORIZATION, HeaderMap};
 use secrecy::{ExposeSecret, SecretString};
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt;
@@ -27,7 +28,7 @@ pub(crate) const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
 pub(crate) const DEFAULT_MODEL: &str = "gpt-5.4-mini";
 
 /// Connection and timeout settings for an LLM API endpoint.
-#[derive(TypedBuilder, Debug, Clone, Serialize, Deserialize)]
+#[derive(TypedBuilder, Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CallConfig {
     /// Covers the full request lifecycle including retries.
     #[builder(default = Duration::from_secs(30))]
@@ -93,7 +94,7 @@ impl Config for CallConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase", deny_unknown_fields)]
 pub enum ReasoningEffort {
     None,
@@ -117,13 +118,15 @@ impl From<ReasoningEffort> for async_openai::types::chat::ReasoningEffort {
     }
 }
 
-#[derive(TypedBuilder, Debug, Clone, Serialize, Deserialize)]
+#[derive(TypedBuilder, Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CallOptions {
     #[builder(default)]
     pub streaming: bool,
     #[builder(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub temperature: Option<f32>,
     #[builder(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_effort: Option<ReasoningEffort>,
     #[builder(default = DEFAULT_MODEL.into())]
     pub model: String,

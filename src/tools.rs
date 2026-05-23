@@ -1,4 +1,4 @@
-use schemars::Schema;
+use schemars::{JsonSchema, Schema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::borrow::Cow;
@@ -7,7 +7,7 @@ use std::hash::Hash;
 
 use crate::error::{ChatKitError, ToolCallError};
 
-#[derive(Debug, Clone, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Deserialize, JsonSchema, PartialEq, Eq, Hash)]
 pub enum ToolChoice {
     Auto,
     Named(String),
@@ -32,7 +32,7 @@ impl From<ToolChoice> for async_openai::types::chat::ChatCompletionToolChoiceOpt
 }
 
 /// JSON Schema wrapper that maps to an OpenAI function tool.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct ToolSchema(pub Schema);
 
 impl ToolSchema {
@@ -90,7 +90,7 @@ pub trait AsOpenApiField<'a> {
 }
 
 /// Manual tool schema builder — alternative to `#[derive(JsonSchema)]` when you need runtime control.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct OpenApiField<'a> {
     pub r#type: &'a str,
