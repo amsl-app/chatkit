@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{THINKING_RE, error::LLMKitError};
@@ -17,7 +18,7 @@ pub(crate) fn extract_thinking(s: &str) -> (Option<String>, String) {
 }
 /// System Message
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemMessage {
     pub name: Option<String>,
     pub content: String,
@@ -36,7 +37,7 @@ impl From<SystemMessage> for async_openai::types::chat::ChatCompletionRequestSys
 
 /// User Message
 ///
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserMessage {
     pub name: Option<String>,
     pub content: String,
@@ -55,7 +56,7 @@ impl From<UserMessage> for async_openai::types::chat::ChatCompletionRequestUserM
 
 /// Assistant Message
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssistantMessage {
     pub name: Option<String>,
     pub text: Option<TextContent>,
@@ -158,7 +159,7 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
                     text: None,
                     thinking: None,
                     refusal: Some(refusal),
-                    }),
+                }),
                 tools: Vec::new(),
                 tokens,
             })
@@ -195,7 +196,7 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TextContent {
     pub text: Option<String>,
     /// Extracted from `<think>…</think>` tags in the model output.
@@ -203,14 +204,14 @@ pub struct TextContent {
     pub refusal: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenUsage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolContent {
     pub id: String,
     pub name: String,
@@ -288,7 +289,7 @@ impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCalls> for Tool
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolMessage {
     pub id: String,
     pub content: String,
@@ -305,7 +306,7 @@ impl From<ToolMessage> for async_openai::types::chat::ChatCompletionRequestToolM
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LLMKitMessage {
     System(SystemMessage),
     User(UserMessage),
@@ -336,7 +337,7 @@ impl TryInto<async_openai::types::chat::ChatCompletionRequestMessage> for LLMKit
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Memory(pub Vec<LLMKitMessage>);
 
 impl TryFrom<Memory> for Vec<async_openai::types::chat::ChatCompletionRequestMessage> {

@@ -6,7 +6,7 @@ use llmkit::{
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
-     dotenvy::dotenv().ok();
+    dotenvy::dotenv().ok();
     let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY must be set");
 
     let config = CallConfig::builder().api_key(api_key.into()).build();
