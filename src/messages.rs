@@ -80,7 +80,7 @@ impl AssistantMessage {
     /// #     AssistantMessage {
     /// #         name: None,
     /// #         text: Some(TextContent {
-    /// #                 text: Some("The answer is 42"),
+    /// #                 text: Some("The answer is 42".to_string()),
     /// #                 thinking: None,
     /// #                 refusal: None,
     /// #             }),
