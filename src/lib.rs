@@ -95,7 +95,7 @@ pub async fn llm_call(
         let res = client.chat().create_stream(request).await;
         match res {
             Ok(stream) => {
-                let stream = process_stream(stream, start_time, service, model);
+                let stream = process_stream(stream, start_time, service, model.into());
                 Ok(ChatKitResponse::Stream(StreamResponse::new(stream)))
             }
             Err(error) => Err(ChatKitError::Api(error)),

@@ -8,6 +8,7 @@ use schemars::JsonSchema;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::fmt;
 use std::pin::Pin;
 use std::str::FromStr;
@@ -196,7 +197,7 @@ pub(crate) fn process_stream(
     + 'static,
     start_time: Instant,
     service: String,
-    model: String,
+    model: Cow<'static, str>,
 ) -> BoxedStream {
     let mut in_think_block = false;
     let mut buffer = String::new();
@@ -360,7 +361,7 @@ pub(crate) fn process_stream(
             metrics::histogram!(
                 "llm_time_to_last_token_ms",
                 "service" => service,
-                "model" => model,
+                "model" => model.clone(),
             ).record(start_time.elapsed().as_millis() as f64);
         }
     }
@@ -444,7 +445,7 @@ mod tests {
         ];
 
         let stream = stream::iter(chunks);
-        let mut processed = process_stream(stream, Instant::now(), "test".to_string(), "test".to_string());
+        let mut processed = process_stream(stream, Instant::now(), "test".to_string(), "test".into());
 
         let msg1 = processed.next().await.unwrap().unwrap();
         let text1 = msg1.text.unwrap();
