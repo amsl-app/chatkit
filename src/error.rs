@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use futures_retry_policies::ShouldRetry;
 use std::error::Error;
 use thiserror::Error;
@@ -32,7 +33,7 @@ pub enum ChatKitError {
     EmptyResponse,
 
     #[error("Unexpected response format: {0}")]
-    UnexpectedResponseFormat(String),
+    UnexpectedResponseFormat(Cow<'static, str>),
 
     #[error("Operation timed out")]
     Timeout,

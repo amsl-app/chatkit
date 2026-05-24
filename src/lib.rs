@@ -156,7 +156,7 @@ pub async fn llm_single_tool_call<T: DeserializeOwned + JsonSchema>(
 
     let ChatKitResponse::Message(llm_response) = llm_response else {
         return Err(ChatKitError::UnexpectedResponseFormat(
-            "Expected non-streaming response for single tool call".to_string(),
+            "Expected non-streaming response for single tool call".into(),
         ));
     };
 
