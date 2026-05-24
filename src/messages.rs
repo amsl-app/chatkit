@@ -4,7 +4,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::{THINKING_RE, error::ChatKitError};
+use crate::error::ChatKitError;
+use crate::utils::THINKING_RE;
 
 pub(crate) fn reject_empty(data: String) -> Option<String> {
     if data.is_empty() { None } else { Some(data) }
@@ -36,7 +37,6 @@ impl From<SystemMessage> for async_openai::types::chat::ChatCompletionRequestSys
 }
 
 /// User Message
-///
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct UserMessage {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -68,6 +68,30 @@ pub struct AssistantMessage {
 }
 
 impl AssistantMessage {
+    /// Extracts the `TextContent` from the current instance, if available.
+    ///
+    /// # Errors
+    /// Returns a `ChatKitError::UnexpectedResponseFormat` when the `text` field is not present.
+    ///
+    /// # Example
+    /// ```rust
+    /// use chatkit::messages::{AssistantMessage, TextContent};
+    /// # fn get_message() -> AssistantMessage {
+    /// #     AssistantMessage {
+    /// #         name: None,
+    /// #         text: Some(TextContent {
+    /// #                 text: Some("The answer is 42".to_string()),
+    /// #                 thinking: None,
+    /// #                 refusal: None,
+    /// #             }),
+    /// #         tools: Vec::new(),
+    /// #         tokens: None,
+    /// #     }
+    /// # }
+    /// # let message = get_message();
+    /// let text = message.expect_text().unwrap();
+    /// assert_eq!(text.text, Some("The answer is 42".to_string()));
+    /// ```
     pub fn expect_text(self) -> Result<TextContent, ChatKitError> {
         self.text
             .ok_or_else(|| ChatKitError::UnexpectedResponseFormat("expected text content, got tool calls".into()))

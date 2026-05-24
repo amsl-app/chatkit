@@ -3,11 +3,9 @@ use crate::messages::{AssistantMessage, Memory, TokenUsage, ToolContent};
 use crate::tools::{ToolChoice, ToolSchema};
 use crate::types::{CallConfig, CallOptions, ChatKitResponse, StreamResponse, process_stream};
 
-use regex::Regex;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use std::error::Error;
-use std::sync::LazyLock;
 use tokio::time::Instant;
 use tracing::instrument;
 
@@ -15,9 +13,7 @@ pub mod error;
 pub mod messages;
 pub mod tools;
 pub mod types;
-
-pub(crate) static THINKING_RE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"(?s)<think>(.*?)</think>").expect("thinking regex is invalid"));
+mod utils;
 
 /// Makes a single LLM call, returning either a complete message or a stream depending on `options.streaming`.
 #[instrument(skip(config))]

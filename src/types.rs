@@ -68,7 +68,7 @@ impl Config for CallConfig {
         );
 
         // Merge custom headers, with custom headers taking precedence
-        for (key, value) in self.custom_headers.iter() {
+        for (key, value) in &self.custom_headers {
             headers.insert(key, value.clone());
         }
 
