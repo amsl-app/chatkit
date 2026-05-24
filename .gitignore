@@ -1,2 +1,8 @@
+# Build artifacts
 /target
+
+# Local config
 .env
+
+# IDEs
+.idea/
