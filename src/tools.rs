@@ -24,19 +24,20 @@ impl From<ToolChoice> for async_openai::types::chat::ChatCompletionToolChoiceOpt
                 async_openai::types::chat::ChatCompletionNamedToolChoice {
                     function: async_openai::types::chat::FunctionName { name },
                 },
-            ), // ToolChoice::Required => ChatCompletionToolChoiceOption::Mode(ToolChoiceOptions::Required),
+            ),
+            // ToolChoice::Required => ChatCompletionToolChoiceOption::Mode(ToolChoiceOptions::Required),
         }
     }
 }
 
-/// JSON Schema wrapper that maps to an OpenAI function tool.
+/// JSON Schema wrapper that maps to an `OpenAI` function tool.
 #[derive(Debug, Clone, Deserialize, JsonSchema)]
 pub struct ToolSchema(pub Schema);
 
 impl ToolSchema {
     #[must_use]
     pub fn name(&self) -> Option<&str> {
-        self.0.get("title").and_then(|v| v.as_str())
+        self.0.get("title").and_then(Value::as_str)
     }
 }
 
@@ -195,6 +196,15 @@ mod tests {
     use super::*;
     use schemars::JsonSchema;
     use serde::{Deserialize, Serialize};
+
+    #[test]
+    fn test_missing_title() {
+        let mut schema = schemars::schema_for!(String);
+        // This will then be a valid schema, but it's missing the title.
+        schema.remove("title");
+        let schema = ToolSchema(schema);
+        assert!(matches!(schema.name(), None), "Expected None for missing title");
+    }
 
     #[test]
     fn test_as_llm_tool() {
