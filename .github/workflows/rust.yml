@@ -10,7 +10,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_VERSION: 1.95.0
-  
+
 jobs:
   build:
     name: Build
@@ -68,4 +68,7 @@ jobs:
           toolchain: ${{ env.RUST_VERSION }}
 
       - name: Run Tests
-        run: cargo test --workspace
+        run: cargo test
+
+      - name: Run Tests with metrics
+        run: cargo test -F metrics
