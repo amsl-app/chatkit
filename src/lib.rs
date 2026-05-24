@@ -65,7 +65,7 @@ pub async fn llm_call(
     let mut http_client_builder = reqwest::Client::builder();
     if streaming {
         // For streaming, only set a connect timeout — a full response timeout would kill
-        // long-running streams before they complete. Also disable auto-decompression since
+        // long-running streams before they complete. Also, disable auto-decompression since
         // SSE streams cannot be gzip-decoded incrementally.
         http_client_builder = http_client_builder
             .connect_timeout(config.iteration_timeout)
@@ -119,9 +119,8 @@ pub async fn llm_call(
         }
 
         tracing::debug!(?res, "received LLM response");
-        let chat_completion = res.map_err(|error| {
-            tracing::warn!(error = &error as &dyn Error, "LLM call failed");
-            ChatKitError::Api(error)
+        let chat_completion = res.inspect_err(|error| {
+            tracing::warn!(error = error as &dyn Error, "LLM call failed");
         })?;
 
         let message: AssistantMessage = chat_completion.try_into()?;

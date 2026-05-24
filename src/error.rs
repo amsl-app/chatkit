@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use futures_retry_policies::ShouldRetry;
+use std::borrow::Cow;
 use std::error::Error;
 use thiserror::Error;
 
