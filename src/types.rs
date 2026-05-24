@@ -79,16 +79,16 @@ impl Config for CallConfig {
         format!("{}{}", self.api_base, path)
     }
 
+    fn query(&self) -> Vec<(&str, &str)> {
+        vec![]
+    }
+
     fn api_base(&self) -> &str {
         &self.api_base
     }
 
     fn api_key(&self) -> &SecretString {
         &self.api_key
-    }
-
-    fn query(&self) -> Vec<(&str, &str)> {
-        vec![]
     }
 }
 
