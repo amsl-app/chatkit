@@ -2,15 +2,16 @@ use crate::error::ChatKitError;
 use crate::messages::AssistantMessage;
 use crate::stream::StreamResponse;
 use async_openai::config::Config;
-use reqwest::header::{AUTHORIZATION, HeaderMap};
+use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderName};
 use schemars::JsonSchema;
 use secrecy::{ExposeSecret, SecretString};
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::time::Duration;
 use typed_builder::TypedBuilder;
 
-pub(crate) const ORGANIZATION_HEADER: &str = "OpenAI-Organization";
-pub(crate) const PROJECT_HEADER: &str = "OpenAI-Project";
+pub(crate) const ORGANIZATION_HEADER: HeaderName = HeaderName::from_static("openai-organization");
+pub(crate) const PROJECT_HEADER: HeaderName = HeaderName::from_static("openai-project");
 
 /// Request Types
 pub(crate) const DEFAULT_API_BASE: &str = "https://api.openai.com/v1";
@@ -44,19 +45,17 @@ impl Config for CallConfig {
     fn headers(&self) -> HeaderMap {
         let mut headers = HeaderMap::new();
         if !self.org_id.is_empty() {
-            headers.insert(ORGANIZATION_HEADER, self.org_id.as_str().parse().unwrap());
+            insert_header(&mut headers, ORGANIZATION_HEADER, &self.org_id);
         }
 
         if !self.project_id.is_empty() {
-            headers.insert(PROJECT_HEADER, self.project_id.as_str().parse().unwrap());
+            insert_header(&mut headers, PROJECT_HEADER, &self.project_id);
         }
 
-        headers.insert(
+        insert_header(
+            &mut headers,
             AUTHORIZATION,
-            format!("Bearer {}", self.api_key.expose_secret())
-                .as_str()
-                .parse()
-                .unwrap(),
+            &format!("Bearer {}", self.api_key.expose_secret()),
         );
 
         // Merge custom headers, with custom headers taking precedence
@@ -82,6 +81,23 @@ impl Config for CallConfig {
     fn api_key(&self) -> &SecretString {
         &self.api_key
     }
+}
+
+fn insert_header(headers: &mut HeaderMap, header: HeaderName, value: &str) {
+    headers.insert(
+        &header,
+        value
+            .parse()
+            .inspect_err(|error| {
+                tracing::error!(
+                    header = header.as_str(),
+                    value,
+                    error = error as &dyn Error,
+                    "invalid OpenAI header value"
+                )
+            })
+            .unwrap(),
+    );
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]

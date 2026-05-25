@@ -134,6 +134,10 @@ impl<S> ProcessedStream<S> {
         emit_pending(self, content);
         ControlFlow::Break(())
     }
+
+    fn finish(&mut self) {
+        self.state = ProcessedStreamState::Finished;
+    }
 }
 
 impl<S> ProcessedStream<S>
@@ -272,16 +276,16 @@ where
                         }
                     }
                     Err(error) => {
-                        self.state = ProcessedStreamState::Finished;
+                        self.finish();
                         return Poll::Ready(Some(Err(error)));
                     }
                 },
                 Poll::Ready(Some(Err(error))) => {
-                    self.state = ProcessedStreamState::Finished;
+                    self.finish();
                     return Poll::Ready(Some(Err(Box::new(error))));
                 }
                 Poll::Ready(None) => {
-                    self.state = ProcessedStreamState::Finished;
+                    self.finish();
                     self.metrics.last_token();
                     return Poll::Ready(None);
                 }
