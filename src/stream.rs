@@ -144,51 +144,51 @@ where
             total_tokens: usage.total_tokens,
         });
 
-        let first = chunk.choices.into_iter().next();
+        let Some(first) = chunk.choices.into_iter().next() else {
+            return Ok(None);
+        };
 
-        if let Some(first) = first {
-            if self.state == ProcessedStreamState::WaitingForFirstToken
-                && (first.delta.content.is_some() || first.delta.tool_calls.is_some())
-            {
-                self.state = ProcessedStreamState::StreamingText;
-                #[cfg(feature = "metrics")]
-                self.record_first_token();
+        if self.state == ProcessedStreamState::WaitingForFirstToken
+            && (first.delta.content.is_some() || first.delta.tool_calls.is_some())
+        {
+            self.state = ProcessedStreamState::StreamingText;
+            #[cfg(feature = "metrics")]
+            self.record_first_token();
+        }
+
+        if let Some(tool_calls) = first.delta.tool_calls {
+            let mut processed_tool_calls = Vec::new();
+            for tc in tool_calls {
+                let tool_call = process_tool_call_chunk(self.previous_tool_call_id.clone(), tc)?;
+                self.previous_tool_call_id = Some(tool_call.id.clone());
+                processed_tool_calls.push(tool_call);
             }
 
-            if let Some(tool_calls) = first.delta.tool_calls {
-                let mut processed_tool_calls = Vec::new();
-                for tc in tool_calls {
-                    let tool_call = process_tool_call_chunk(self.previous_tool_call_id.clone(), tc)?;
-                    self.previous_tool_call_id = Some(tool_call.id.clone());
-                    processed_tool_calls.push(tool_call);
-                }
-
-                self.emit_message(
-                    &mut first_message,
-                    AssistantMessage {
-                        name: None,
+            self.emit_message(
+                &mut first_message,
+                AssistantMessage {
+                    name: None,
+                    text: None,
+                    tools: processed_tool_calls,
+                    tokens,
+                },
+            );
+        } else if let Some(refusal) = first.delta.refusal {
+            self.emit_message(
+                &mut first_message,
+                AssistantMessage {
+                    name: None,
+                    text: Some(TextContent {
                         text: None,
-                        tools: processed_tool_calls,
-                        tokens,
-                    },
-                );
-            } else if let Some(refusal) = first.delta.refusal {
-                self.emit_message(
-                    &mut first_message,
-                    AssistantMessage {
-                        name: None,
-                        text: Some(TextContent {
-                            text: None,
-                            thinking: None,
-                            refusal: Some(refusal),
-                        }),
-                        tools: Vec::new(),
-                        tokens,
-                    },
-                );
-            } else if let Some(content) = first.delta.content {
-                first_message = self.process_content(content);
-            }
+                        thinking: None,
+                        refusal: Some(refusal),
+                    }),
+                    tools: Vec::new(),
+                    tokens,
+                },
+            );
+        } else if let Some(content) = first.delta.content {
+            first_message = self.process_content(content);
         }
 
         Ok(first_message)
