@@ -138,10 +138,10 @@ where
         chunk: async_openai::types::chat::CreateChatCompletionStreamResponse,
     ) -> Result<Option<AssistantMessage>, StreamingError> {
         let mut first_message = None;
-        let tokens = chunk.usage.as_ref().map(|u| TokenUsage {
-            prompt_tokens: u.prompt_tokens,
-            completion_tokens: u.completion_tokens,
-            total_tokens: u.total_tokens,
+        let tokens = chunk.usage.as_ref().map(|usage| TokenUsage {
+            prompt_tokens: usage.prompt_tokens,
+            completion_tokens: usage.completion_tokens,
+            total_tokens: usage.total_tokens,
         });
 
         let first = chunk.choices.into_iter().next();
