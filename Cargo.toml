@@ -16,7 +16,6 @@ async-openai = { version = "0.40.2", features = [
     "chat-completion",
     "middleware",
 ] }
-async-stream = "0.3.6"
 futures = "0.3.32"
 futures-retry-policies = "0.3.1"
 regex = "1.12.3"

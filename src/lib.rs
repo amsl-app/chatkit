@@ -1,16 +1,18 @@
 use crate::error::{ChatKitError, ToolCallError};
 use crate::messages::{AssistantMessage, Memory, TokenUsage, ToolContent};
 use crate::tools::{ToolChoice, ToolSchema};
-use crate::types::{CallConfig, CallOptions, ChatKitResponse, StreamResponse, process_stream};
+use crate::types::{CallConfig, CallOptions, ChatKitResponse};
 
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use std::error::Error;
+use stream::{StreamResponse, process_stream};
 use tokio::time::Instant;
 use tracing::instrument;
 
 pub mod error;
 pub mod messages;
+mod stream;
 pub mod tools;
 pub mod types;
 mod utils;
