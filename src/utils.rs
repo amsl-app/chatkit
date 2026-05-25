@@ -15,3 +15,20 @@ pub(crate) fn extract_thinking(s: &str) -> (Option<String>, String) {
 pub(crate) fn reject_empty(data: String) -> Option<String> {
     if data.is_empty() { None } else { Some(data) }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_thinking() {
+        let (thinking, cleaned) = extract_thinking("<think>thinking hard</think>The answer is 42");
+        assert_eq!(thinking, Some("thinking hard".to_string()));
+        assert_eq!(cleaned, "The answer is 42");
+    }
+
+    #[test]
+    fn test_reject_empty() {
+        assert_eq!(reject_empty("".to_string()), None);
+    }
+}
