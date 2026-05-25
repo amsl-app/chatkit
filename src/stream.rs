@@ -1,5 +1,5 @@
 use crate::error::{ChatKitError, StreamingError, ToolCallError};
-use crate::messages::{AssistantMessage, TokenUsage, ToolContent, extract_thinking, reject_empty};
+use crate::messages::{AssistantMessage, TokenUsage, ToolContent};
 use crate::metrics::MetricsRecorder;
 use futures::{Stream, StreamExt};
 use serde_json::Value;
@@ -10,6 +10,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::sync::Mutex;
+use crate::utils::{extract_thinking, reject_empty};
 
 pub(crate) type BoxedStream = Pin<Box<dyn Stream<Item = Result<AssistantMessage, StreamingError>> + Send>>;
 
@@ -297,11 +298,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{ProcessedStream, process_stream};
+    use super::{process_stream, ProcessedStream};
     use crate::config::CallConfig;
     use crate::metrics::MetricsRecorder;
     use async_openai::types::chat::{ChatCompletionMessageToolCallChunk, CreateChatCompletionStreamResponse};
-    use futures::{StreamExt, stream};
+    use futures::{stream, StreamExt};
 
     fn test_metrics() -> MetricsRecorder {
         let config = CallConfig::builder().build();

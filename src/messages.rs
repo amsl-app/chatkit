@@ -5,19 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::ChatKitError;
-use crate::utils::THINKING_RE;
+use crate::utils;
 
-pub(crate) fn reject_empty(data: String) -> Option<String> {
-    if data.is_empty() { None } else { Some(data) }
-}
-
-pub(crate) fn extract_thinking(s: &str) -> (Option<String>, String) {
-    let thinking = THINKING_RE
-        .captures(s)
-        .and_then(|caps| caps.get(1).map(|m| m.as_str().to_string()));
-    let cleaned = THINKING_RE.replace_all(s, "").to_string();
-    (thinking, cleaned)
-}
 /// System Message
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -206,9 +195,9 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
         } else if let Some(refusal) = first.message.refusal {
             Ok(AssistantMessage::refusal(refusal, tokens))
         } else if let Some(content) = first.message.content {
-            let (thinking, text) = extract_thinking(&content);
+            let (thinking, text) = utils::extract_thinking(&content);
 
-            let text = reject_empty(text);
+            let text = utils::reject_empty(text);
 
             let content_len = content.len();
             let thinking_len = thinking.as_ref().map(String::len);
@@ -276,7 +265,7 @@ impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCall> for ToolC
     fn try_from(value: async_openai::types::chat::ChatCompletionMessageToolCall) -> Result<Self, Self::Error> {
         let async_openai::types::chat::ChatCompletionMessageToolCall { id, function } = value;
         let async_openai::types::chat::FunctionCall { name, arguments } = function;
-        let (thinking, arguments) = extract_thinking(&arguments);
+        let (thinking, arguments) = utils::extract_thinking(&arguments);
         let arguments_len = arguments.len();
         let arguments = Value::from_str(&arguments)?;
         let argument_keys: Vec<&str> = match &arguments {
