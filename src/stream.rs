@@ -1,5 +1,5 @@
 use crate::error::{ChatKitError, StreamingError, ToolCallError};
-use crate::messages::{AssistantMessage, TextContent, TokenUsage, ToolContent, extract_thinking, reject_empty};
+use crate::messages::{AssistantMessage, TokenUsage, ToolContent, extract_thinking, reject_empty};
 use futures::{Stream, StreamExt};
 use serde_json::Value;
 use std::borrow::Cow;
@@ -95,31 +95,13 @@ impl<S> ProcessedStream<S> {
 
     fn emit_text(&mut self, text: String) {
         if let Some(text) = reject_empty(text) {
-            self.emit_message(AssistantMessage {
-                name: None,
-                text: Some(TextContent {
-                    text: Some(text),
-                    thinking: None,
-                    refusal: None,
-                }),
-                tools: Vec::new(),
-                tokens: None,
-            });
+            self.emit_message(AssistantMessage::text(text));
         }
     }
 
     fn emit_thinking(&mut self, thinking: String) {
         if let Some(thinking) = reject_empty(thinking) {
-            self.emit_message(AssistantMessage {
-                name: None,
-                text: Some(TextContent {
-                    text: None,
-                    thinking: Some(thinking),
-                    refusal: None,
-                }),
-                tools: Vec::new(),
-                tokens: None,
-            });
+            self.emit_message(AssistantMessage::thinking(Some(thinking)));
         }
     }
 
@@ -189,23 +171,9 @@ where
                 processed_tool_calls.push(tool_call);
             }
 
-            self.emit_message(AssistantMessage {
-                name: None,
-                text: None,
-                tools: processed_tool_calls,
-                tokens,
-            });
+            self.emit_message(AssistantMessage::tools(processed_tool_calls, tokens));
         } else if let Some(refusal) = first.delta.refusal {
-            self.emit_message(AssistantMessage {
-                name: None,
-                text: Some(TextContent {
-                    text: None,
-                    thinking: None,
-                    refusal: Some(refusal),
-                }),
-                tools: Vec::new(),
-                tokens,
-            });
+            self.emit_message(AssistantMessage::refusal(refusal, tokens));
         } else if let Some(content) = first.delta.content {
             self.state = ProcessedStreamState::StreamingText;
             self.process_content(content);
@@ -247,16 +215,7 @@ where
                 self.buffer.drain(..pos + 8);
                 self.state = ProcessedStreamState::StreamingText;
 
-                self.emit_message(AssistantMessage {
-                    name: None,
-                    text: Some(TextContent {
-                        text: None,
-                        thinking: reject_empty(thinking),
-                        refusal: None,
-                    }),
-                    tools: Vec::new(),
-                    tokens: None,
-                });
+                self.emit_message(AssistantMessage::thinking(reject_empty(thinking)));
             } else {
                 // No </think> tag found. Yield everything up to a possible partial tag.
                 if let Some(last_lt) = self.buffer.rfind('<') {
