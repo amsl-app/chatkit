@@ -35,7 +35,7 @@ pub async fn llm_call(
 
     let start_time = Instant::now();
 
-    let service = config.api_base.clone();
+    let service = config.api_base.clone().into();
 
     let mut request = async_openai::types::chat::CreateChatCompletionRequestArgs::default();
     let messages: Vec<async_openai::types::chat::ChatCompletionRequestMessage> = memory.try_into()?;

@@ -54,7 +54,7 @@ pub(crate) fn process_stream(
     + Send
     + 'static,
     start_time: Instant,
-    service: String,
+    service: Cow<'static, str>,
     model: Cow<'static, str>,
 ) -> BoxedStream {
     ProcessedStream::new(stream, start_time, service, model).boxed()
@@ -64,7 +64,7 @@ pub(crate) fn process_stream(
 struct ProcessedStream<S> {
     stream: S,
     start_time: Instant,
-    service: String,
+    service: Cow<'static, str>,
     model: Cow<'static, str>,
     state: ProcessedStreamState,
     buffer: String,
@@ -81,7 +81,7 @@ enum ProcessedStreamState {
 }
 
 impl<S> ProcessedStream<S> {
-    fn new(stream: S, start_time: Instant, service: String, model: Cow<'static, str>) -> Self {
+    fn new(stream: S, start_time: Instant, service: Cow<'static, str>, model: Cow<'static, str>) -> Self {
         Self {
             stream,
             start_time,
@@ -220,7 +220,7 @@ where
     }
 
     fn process_content(&mut self, content: &str) {
-        self.buffer.push_str(&content);
+        self.buffer.push_str(content);
 
         loop {
             let control_flow = if self.state == ProcessedStreamState::StreamingThinking {
@@ -349,7 +349,7 @@ mod tests {
         let chunk: ChatCompletionMessageToolCallChunk = serde_json::from_str(json).unwrap();
 
         let stream = stream::empty::<Result<CreateChatCompletionStreamResponse, async_openai::error::OpenAIError>>();
-        let mut processed = ProcessedStream::new(stream, Instant::now(), "test".to_string(), "test".into());
+        let mut processed = ProcessedStream::new(stream, Instant::now(), "test".into(), "test".into());
         let response = processed.process_tool_call_chunk(chunk).unwrap();
         assert_eq!(response.name, "test_tool");
         assert_eq!(response.thinking, Some("streaming tool thoughts".to_string()));
@@ -396,7 +396,7 @@ mod tests {
         ];
 
         let stream = stream::iter(chunks);
-        let mut processed = process_stream(stream, Instant::now(), "test".to_string(), "test".into());
+        let mut processed = process_stream(stream, Instant::now(), "test".into(), "test".into());
 
         let msg1 = processed.next().await.unwrap().unwrap();
         let text1 = msg1.text.unwrap();
