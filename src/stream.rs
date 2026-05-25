@@ -137,7 +137,6 @@ where
         &mut self,
         chunk: async_openai::types::chat::CreateChatCompletionStreamResponse,
     ) -> Result<Option<AssistantMessage>, StreamingError> {
-        let mut first_message = None;
         let tokens = chunk.usage.as_ref().map(|usage| TokenUsage {
             prompt_tokens: usage.prompt_tokens,
             completion_tokens: usage.completion_tokens,
@@ -164,35 +163,29 @@ where
                 processed_tool_calls.push(tool_call);
             }
 
-            self.emit_message(
-                &mut first_message,
-                AssistantMessage {
-                    name: None,
-                    text: None,
-                    tools: processed_tool_calls,
-                    tokens,
-                },
-            );
+            return Ok(Some(AssistantMessage {
+                name: None,
+                text: None,
+                tools: processed_tool_calls,
+                tokens,
+            }));
         } else if let Some(refusal) = first.delta.refusal {
-            self.emit_message(
-                &mut first_message,
-                AssistantMessage {
-                    name: None,
-                    text: Some(TextContent {
-                        text: None,
-                        thinking: None,
-                        refusal: Some(refusal),
-                    }),
-                    tools: Vec::new(),
-                    tokens,
-                },
-            );
+            return Ok(Some(AssistantMessage {
+                name: None,
+                text: Some(TextContent {
+                    text: None,
+                    thinking: None,
+                    refusal: Some(refusal),
+                }),
+                tools: Vec::new(),
+                tokens,
+            }));
         } else if let Some(content) = first.delta.content {
             self.state = ProcessedStreamState::StreamingText;
-            first_message = self.process_content(content);
+            return Ok(self.process_content(content));
         }
 
-        Ok(first_message)
+        Ok(None)
     }
 
     fn process_content(&mut self, content: String) -> Option<AssistantMessage> {
