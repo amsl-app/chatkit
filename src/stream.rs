@@ -64,7 +64,7 @@ struct ProcessedStream<S> {
     state: ProcessedStreamState,
     buffer: String,
     previous_tool_call_id: Option<String>,
-    pending: VecDeque<Result<AssistantMessage, StreamingError>>,
+    pending: VecDeque<AssistantMessage>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -89,8 +89,12 @@ impl<S> ProcessedStream<S> {
         }
     }
 
-    fn push_message(&mut self, message: AssistantMessage) {
-        self.pending.push_back(Ok(message));
+    fn emit_message(&mut self, first_message: &mut Option<AssistantMessage>, message: AssistantMessage) {
+        if first_message.is_none() {
+            *first_message = Some(message);
+        } else {
+            self.pending.push_back(message);
+        }
     }
 
     #[cfg(feature = "metrics")]
@@ -129,10 +133,11 @@ where
             >,
         > + Unpin,
 {
-    fn process_chunk(
+    fn process_chat_chunk(
         &mut self,
         chunk: async_openai::types::chat::CreateChatCompletionStreamResponse,
-    ) -> Result<(), StreamingError> {
+    ) -> Result<Option<AssistantMessage>, StreamingError> {
+        let mut first_message = None;
         let tokens = chunk.usage.as_ref().map(|u| TokenUsage {
             prompt_tokens: u.prompt_tokens,
             completion_tokens: u.completion_tokens,
@@ -158,32 +163,39 @@ where
                     processed_tool_calls.push(tool_call);
                 }
 
-                self.push_message(AssistantMessage {
-                    name: None,
-                    text: None,
-                    tools: processed_tool_calls,
-                    tokens,
-                });
-            } else if let Some(refusal) = first.delta.refusal {
-                self.push_message(AssistantMessage {
-                    name: None,
-                    text: Some(TextContent {
+                self.emit_message(
+                    &mut first_message,
+                    AssistantMessage {
+                        name: None,
                         text: None,
-                        thinking: None,
-                        refusal: Some(refusal),
-                    }),
-                    tools: Vec::new(),
-                    tokens,
-                });
+                        tools: processed_tool_calls,
+                        tokens,
+                    },
+                );
+            } else if let Some(refusal) = first.delta.refusal {
+                self.emit_message(
+                    &mut first_message,
+                    AssistantMessage {
+                        name: None,
+                        text: Some(TextContent {
+                            text: None,
+                            thinking: None,
+                            refusal: Some(refusal),
+                        }),
+                        tools: Vec::new(),
+                        tokens,
+                    },
+                );
             } else if let Some(content) = first.delta.content {
-                self.process_content(content);
+                first_message = self.process_content(content);
             }
         }
 
-        Ok(())
+        Ok(first_message)
     }
 
-    fn process_content(&mut self, content: String) {
+    fn process_content(&mut self, content: String) -> Option<AssistantMessage> {
+        let mut first_message = None;
         self.buffer.push_str(&content);
 
         loop {
@@ -194,16 +206,19 @@ where
                     self.state = ProcessedStreamState::StreamingThinking;
 
                     if let Some(text) = reject_empty(text) {
-                        self.push_message(AssistantMessage {
-                            name: None,
-                            text: Some(TextContent {
-                                text: Some(text),
-                                thinking: None,
-                                refusal: None,
-                            }),
-                            tools: Vec::new(),
-                            tokens: None,
-                        });
+                        self.emit_message(
+                            &mut first_message,
+                            AssistantMessage {
+                                name: None,
+                                text: Some(TextContent {
+                                    text: Some(text),
+                                    thinking: None,
+                                    refusal: None,
+                                }),
+                                tools: Vec::new(),
+                                tokens: None,
+                            },
+                        );
                     }
                 } else {
                     // No <think> tag found. Yield everything up to a possible partial tag.
@@ -213,16 +228,19 @@ where
                             let to_yield = self.buffer[..last_lt].to_string();
                             self.buffer.drain(..last_lt);
                             if let Some(text) = reject_empty(to_yield) {
-                                self.push_message(AssistantMessage {
-                                    name: None,
-                                    text: Some(TextContent {
-                                        text: Some(text),
-                                        thinking: None,
-                                        refusal: None,
-                                    }),
-                                    tools: Vec::new(),
-                                    tokens: None,
-                                });
+                                self.emit_message(
+                                    &mut first_message,
+                                    AssistantMessage {
+                                        name: None,
+                                        text: Some(TextContent {
+                                            text: Some(text),
+                                            thinking: None,
+                                            refusal: None,
+                                        }),
+                                        tools: Vec::new(),
+                                        tokens: None,
+                                    },
+                                );
                             }
                             break;
                         }
@@ -231,16 +249,19 @@ where
                     let to_yield = self.buffer.clone();
                     self.buffer.clear();
                     if let Some(text) = reject_empty(to_yield) {
-                        self.push_message(AssistantMessage {
-                            name: None,
-                            text: Some(TextContent {
-                                text: Some(text),
-                                thinking: None,
-                                refusal: None,
-                            }),
-                            tools: Vec::new(),
-                            tokens: None,
-                        });
+                        self.emit_message(
+                            &mut first_message,
+                            AssistantMessage {
+                                name: None,
+                                text: Some(TextContent {
+                                    text: Some(text),
+                                    thinking: None,
+                                    refusal: None,
+                                }),
+                                tools: Vec::new(),
+                                tokens: None,
+                            },
+                        );
                     }
                     break;
                 }
@@ -249,16 +270,19 @@ where
                 self.buffer.drain(..pos + 8);
                 self.state = ProcessedStreamState::StreamingText;
 
-                self.push_message(AssistantMessage {
-                    name: None,
-                    text: Some(TextContent {
-                        text: None,
-                        thinking: reject_empty(thinking),
-                        refusal: None,
-                    }),
-                    tools: Vec::new(),
-                    tokens: None,
-                });
+                self.emit_message(
+                    &mut first_message,
+                    AssistantMessage {
+                        name: None,
+                        text: Some(TextContent {
+                            text: None,
+                            thinking: reject_empty(thinking),
+                            refusal: None,
+                        }),
+                        tools: Vec::new(),
+                        tokens: None,
+                    },
+                );
             } else {
                 // No </think> tag found. Yield everything up to a possible partial tag.
                 if let Some(last_lt) = self.buffer.rfind('<') {
@@ -267,16 +291,19 @@ where
                         let to_yield = self.buffer[..last_lt].to_string();
                         self.buffer.drain(..last_lt);
                         if let Some(thinking) = reject_empty(to_yield) {
-                            self.push_message(AssistantMessage {
-                                name: None,
-                                text: Some(TextContent {
-                                    text: None,
-                                    thinking: Some(thinking),
-                                    refusal: None,
-                                }),
-                                tools: Vec::new(),
-                                tokens: None,
-                            });
+                            self.emit_message(
+                                &mut first_message,
+                                AssistantMessage {
+                                    name: None,
+                                    text: Some(TextContent {
+                                        text: None,
+                                        thinking: Some(thinking),
+                                        refusal: None,
+                                    }),
+                                    tools: Vec::new(),
+                                    tokens: None,
+                                },
+                            );
                         }
                         break;
                     }
@@ -285,20 +312,25 @@ where
                 let to_yield = self.buffer.clone();
                 self.buffer.clear();
                 if let Some(thinking) = reject_empty(to_yield) {
-                    self.push_message(AssistantMessage {
-                        name: None,
-                        text: Some(TextContent {
-                            text: None,
-                            thinking: Some(thinking),
-                            refusal: None,
-                        }),
-                        tools: Vec::new(),
-                        tokens: None,
-                    });
+                    self.emit_message(
+                        &mut first_message,
+                        AssistantMessage {
+                            name: None,
+                            text: Some(TextContent {
+                                text: None,
+                                thinking: Some(thinking),
+                                refusal: None,
+                            }),
+                            tools: Vec::new(),
+                            tokens: None,
+                        },
+                    );
                 }
                 break;
             }
         }
+
+        first_message
     }
 }
 
@@ -315,7 +347,7 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         if let Some(message) = self.pending.pop_front() {
-            return Poll::Ready(Some(message));
+            return Poll::Ready(Some(Ok(message)));
         }
 
         if self.state == ProcessedStreamState::Finished {
@@ -324,16 +356,14 @@ where
 
         loop {
             match Pin::new(&mut self.stream).poll_next(cx) {
-                Poll::Ready(Some(Ok(chunk))) => {
-                    if let Err(error) = self.process_chunk(chunk) {
+                Poll::Ready(Some(Ok(chunk))) => match self.process_chat_chunk(chunk) {
+                    Ok(Some(message)) => return Poll::Ready(Some(Ok(message))),
+                    Ok(None) => {}
+                    Err(error) => {
                         self.state = ProcessedStreamState::Finished;
                         return Poll::Ready(Some(Err(error)));
                     }
-
-                    if let Some(message) = self.pending.pop_front() {
-                        return Poll::Ready(Some(message));
-                    }
-                }
+                },
                 Poll::Ready(Some(Err(error))) => {
                     self.state = ProcessedStreamState::Finished;
                     return Poll::Ready(Some(Err(Box::new(error))));
