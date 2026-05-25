@@ -269,14 +269,14 @@ where
 
 fn tool_call_parts(value: ToolCallChunk) -> Result<(Option<String>, String, String), ChatKitError> {
     let ToolCallChunk { id, function, .. } = value;
-    let function = function.ok_or(ChatKitError::EmptyResponse)?;
-    let async_openai::types::chat::FunctionCallStream { name, arguments } = function;
-
-    Ok((
-        id,
-        name.ok_or(ChatKitError::EmptyResponse)?,
-        arguments.ok_or(ChatKitError::EmptyResponse)?,
-    ))
+    if let Some(function) = function
+        && let async_openai::types::chat::FunctionCallStream { name, arguments } = function
+        && let Some(name) = name
+        && let Some(arguments) = arguments
+    {
+        return Ok((id, name, arguments));
+    }
+    Err(ChatKitError::EmptyResponse)
 }
 
 impl<S> Stream for ProcessedStream<S>
