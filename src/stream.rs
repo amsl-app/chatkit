@@ -5,6 +5,7 @@ use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::fmt;
+use std::ops::ControlFlow;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -13,6 +14,9 @@ use tokio::sync::Mutex;
 use tokio::time::Instant;
 
 type BoxedStream = Pin<Box<dyn Stream<Item = Result<AssistantMessage, StreamingError>> + Send>>;
+
+const THINK_OPEN_TAG: &str = "<think>";
+const THINK_CLOSE_TAG: &str = "</think>";
 
 /// Clonable handle to a streaming LLM response; the inner stream is shared via `Arc<Mutex>`.
 pub struct StreamResponse(Arc<Mutex<BoxedStream>>);
@@ -105,6 +109,40 @@ impl<S> ProcessedStream<S> {
         }
     }
 
+    fn emit_thinking_boundary(&mut self, thinking: String) {
+        self.emit_message(AssistantMessage::thinking(reject_empty(thinking)));
+    }
+
+    fn process_until_tag(
+        &mut self,
+        tag: &str,
+        next_state: ProcessedStreamState,
+        emit_found: fn(&mut Self, String),
+        emit_pending: fn(&mut Self, String),
+    ) -> ControlFlow<()> {
+        if let Some(pos) = self.buffer.find(tag) {
+            let content = self.buffer[..pos].to_string();
+            self.buffer.drain(..pos + tag.len());
+            self.state = next_state;
+            emit_found(self, content);
+            return ControlFlow::Continue(());
+        }
+
+        if let Some(last_lt) = self.buffer.rfind('<') {
+            let remaining = &self.buffer[last_lt..];
+            if tag.starts_with(remaining) {
+                let content = self.buffer[..last_lt].to_string();
+                self.buffer.drain(..last_lt);
+                emit_pending(self, content);
+                return ControlFlow::Break(());
+            }
+        }
+
+        let content = std::mem::take(&mut self.buffer);
+        emit_pending(self, content);
+        ControlFlow::Break(())
+    }
+
     #[cfg(feature = "metrics")]
     fn record_first_token(&self) {
         // The precision loss is fine here, as we are only using it for metrics.
@@ -186,51 +224,23 @@ where
         self.buffer.push_str(&content);
 
         loop {
-            if self.state != ProcessedStreamState::StreamingThinking {
-                if let Some(pos) = self.buffer.find("<think>") {
-                    let text = self.buffer[..pos].to_string();
-                    self.buffer.drain(..pos + 7);
-                    self.state = ProcessedStreamState::StreamingThinking;
-
-                    self.emit_text(text);
-                } else {
-                    // No <think> tag found. Yield everything up to a possible partial tag.
-                    if let Some(last_lt) = self.buffer.rfind('<') {
-                        let remaining = &self.buffer[last_lt..];
-                        if "<think>".starts_with(remaining) {
-                            let to_yield = self.buffer[..last_lt].to_string();
-                            self.buffer.drain(..last_lt);
-                            self.emit_text(to_yield);
-                            break;
-                        }
-                    }
-
-                    let to_yield = self.buffer.clone();
-                    self.buffer.clear();
-                    self.emit_text(to_yield);
-                    break;
-                }
-            } else if let Some(pos) = self.buffer.find("</think>") {
-                let thinking = self.buffer[..pos].to_string();
-                self.buffer.drain(..pos + 8);
-                self.state = ProcessedStreamState::StreamingText;
-
-                self.emit_message(AssistantMessage::thinking(reject_empty(thinking)));
+            let control_flow = if self.state != ProcessedStreamState::StreamingThinking {
+                self.process_until_tag(
+                    THINK_OPEN_TAG,
+                    ProcessedStreamState::StreamingThinking,
+                    Self::emit_text,
+                    Self::emit_text,
+                )
             } else {
-                // No </think> tag found. Yield everything up to a possible partial tag.
-                if let Some(last_lt) = self.buffer.rfind('<') {
-                    let remaining = &self.buffer[last_lt..];
-                    if "</think>".starts_with(remaining) {
-                        let to_yield = self.buffer[..last_lt].to_string();
-                        self.buffer.drain(..last_lt);
-                        self.emit_thinking(to_yield);
-                        break;
-                    }
-                }
+                self.process_until_tag(
+                    THINK_CLOSE_TAG,
+                    ProcessedStreamState::StreamingText,
+                    Self::emit_thinking_boundary,
+                    Self::emit_thinking,
+                )
+            };
 
-                let to_yield = self.buffer.clone();
-                self.buffer.clear();
-                self.emit_thinking(to_yield);
+            if control_flow.is_break() {
                 break;
             }
         }
