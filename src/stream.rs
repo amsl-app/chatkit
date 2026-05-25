@@ -1,8 +1,8 @@
 use crate::error::{ChatKitError, StreamingError, ToolCallError};
 use crate::messages::{AssistantMessage, TokenUsage, ToolContent, extract_thinking, reject_empty};
+use crate::metrics::MetricsRecorder;
 use futures::{Stream, StreamExt};
 use serde_json::Value;
-use std::borrow::Cow;
 use std::collections::VecDeque;
 use std::fmt;
 use std::ops::ControlFlow;
@@ -10,9 +10,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::sync::Mutex;
-use tokio::time::Instant;
 
-type BoxedStream = Pin<Box<dyn Stream<Item = Result<AssistantMessage, StreamingError>> + Send>>;
+pub(crate) type BoxedStream = Pin<Box<dyn Stream<Item = Result<AssistantMessage, StreamingError>> + Send>>;
 
 const THINK_OPEN_TAG: &str = "<think>";
 const THINK_CLOSE_TAG: &str = "</think>";
@@ -46,18 +45,15 @@ impl Clone for StreamResponse {
     }
 }
 
-#[cfg_attr(not(feature = "metrics"), allow(unused_variables))]
 pub(crate) fn process_stream(
     stream: impl Stream<
         Item = Result<async_openai::types::chat::CreateChatCompletionStreamResponse, async_openai::error::OpenAIError>,
     > + Unpin
     + Send
     + 'static,
-    start_time: Instant,
-    service: Cow<'static, str>,
-    model: Cow<'static, str>,
+    metrics: MetricsRecorder,
 ) -> BoxedStream {
-    ProcessedStream::new(stream, MetricsRecorder::new(start_time, service, model)).boxed()
+    ProcessedStream::new(stream, metrics).boxed()
 }
 
 struct ProcessedStream<S> {
@@ -67,62 +63,6 @@ struct ProcessedStream<S> {
     buffer: String,
     previous_tool_call_id: Option<String>,
     pending: VecDeque<AssistantMessage>,
-}
-
-#[cfg(feature = "metrics")]
-struct MetricsRecorder {
-    start_time: Instant,
-    service: Cow<'static, str>,
-    model: Cow<'static, str>,
-}
-
-#[cfg(not(feature = "metrics"))]
-struct MetricsRecorder;
-
-#[cfg(feature = "metrics")]
-impl MetricsRecorder {
-    fn new(start_time: Instant, service: Cow<'static, str>, model: Cow<'static, str>) -> Self {
-        Self {
-            start_time,
-            service,
-            model,
-        }
-    }
-
-    fn first_token(&self) {
-        // The precision loss is fine here, as we are only using it for metrics.
-        // TODO use as_millis_f64() once it is stable
-        #[allow(clippy::cast_precision_loss)]
-        metrics::histogram!(
-            "llm_time_to_first_token_ms",
-            "service" => self.service.clone(),
-            "model" => self.model.clone(),
-        )
-        .record(self.start_time.elapsed().as_millis() as f64);
-    }
-
-    fn last_token(&self) {
-        // The precision loss is fine here, as we are only using it for metrics.
-        // TODO use as_millis_f64() once it is stable
-        #[allow(clippy::cast_precision_loss)]
-        metrics::histogram!(
-            "llm_time_to_last_token_ms",
-            "service" => self.service.clone(),
-            "model" => self.model.clone(),
-        )
-        .record(self.start_time.elapsed().as_millis() as f64);
-    }
-}
-
-#[cfg(not(feature = "metrics"))]
-impl MetricsRecorder {
-    fn new(_start_time: Instant, _service: Cow<'static, str>, _model: Cow<'static, str>) -> Self {
-        Self
-    }
-
-    fn first_token(&self) {}
-
-    fn last_token(&self) {}
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -354,9 +294,15 @@ where
 #[cfg(test)]
 mod tests {
     use super::{ProcessedStream, process_stream};
+    use crate::metrics::MetricsRecorder;
+    use crate::types::CallConfig;
     use async_openai::types::chat::{ChatCompletionMessageToolCallChunk, CreateChatCompletionStreamResponse};
     use futures::{StreamExt, stream};
-    use tokio::time::Instant;
+
+    fn test_metrics() -> MetricsRecorder {
+        let config = CallConfig::builder().build();
+        MetricsRecorder::new(&config, "test")
+    }
 
     #[test]
     fn test_streaming_with_tools() {
@@ -372,8 +318,7 @@ mod tests {
         let chunk: ChatCompletionMessageToolCallChunk = serde_json::from_str(json).unwrap();
 
         let stream = stream::empty::<Result<CreateChatCompletionStreamResponse, async_openai::error::OpenAIError>>();
-        let metrics = super::MetricsRecorder::new(Instant::now(), "test".into(), "test".into());
-        let mut processed = ProcessedStream::new(stream, metrics);
+        let mut processed = ProcessedStream::new(stream, test_metrics());
         let response = processed.process_tool_call_chunk(chunk).unwrap();
         assert_eq!(response.name, "test_tool");
         assert_eq!(response.thinking, Some("streaming tool thoughts".to_string()));
@@ -420,7 +365,7 @@ mod tests {
         ];
 
         let stream = stream::iter(chunks);
-        let mut processed = process_stream(stream, Instant::now(), "test".into(), "test".into());
+        let mut processed = process_stream(stream, test_metrics());
 
         let msg1 = processed.next().await.unwrap().unwrap();
         let text1 = msg1.text.unwrap();
