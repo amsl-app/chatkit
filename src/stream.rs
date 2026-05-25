@@ -97,6 +97,42 @@ impl<S> ProcessedStream<S> {
         }
     }
 
+    fn emit_text(&mut self, first_message: &mut Option<AssistantMessage>, text: String) {
+        if let Some(text) = reject_empty(text) {
+            self.emit_message(
+                first_message,
+                AssistantMessage {
+                    name: None,
+                    text: Some(TextContent {
+                        text: Some(text),
+                        thinking: None,
+                        refusal: None,
+                    }),
+                    tools: Vec::new(),
+                    tokens: None,
+                },
+            );
+        }
+    }
+
+    fn emit_thinking(&mut self, first_message: &mut Option<AssistantMessage>, thinking: String) {
+        if let Some(thinking) = reject_empty(thinking) {
+            self.emit_message(
+                first_message,
+                AssistantMessage {
+                    name: None,
+                    text: Some(TextContent {
+                        text: None,
+                        thinking: Some(thinking),
+                        refusal: None,
+                    }),
+                    tools: Vec::new(),
+                    tokens: None,
+                },
+            );
+        }
+    }
+
     #[cfg(feature = "metrics")]
     fn record_first_token(&self) {
         // The precision loss is fine here, as we are only using it for metrics.
@@ -199,21 +235,7 @@ where
                     self.buffer.drain(..pos + 7);
                     self.state = ProcessedStreamState::StreamingThinking;
 
-                    if let Some(text) = reject_empty(text) {
-                        self.emit_message(
-                            &mut first_message,
-                            AssistantMessage {
-                                name: None,
-                                text: Some(TextContent {
-                                    text: Some(text),
-                                    thinking: None,
-                                    refusal: None,
-                                }),
-                                tools: Vec::new(),
-                                tokens: None,
-                            },
-                        );
-                    }
+                    self.emit_text(&mut first_message, text);
                 } else {
                     // No <think> tag found. Yield everything up to a possible partial tag.
                     if let Some(last_lt) = self.buffer.rfind('<') {
@@ -221,42 +243,14 @@ where
                         if "<think>".starts_with(remaining) {
                             let to_yield = self.buffer[..last_lt].to_string();
                             self.buffer.drain(..last_lt);
-                            if let Some(text) = reject_empty(to_yield) {
-                                self.emit_message(
-                                    &mut first_message,
-                                    AssistantMessage {
-                                        name: None,
-                                        text: Some(TextContent {
-                                            text: Some(text),
-                                            thinking: None,
-                                            refusal: None,
-                                        }),
-                                        tools: Vec::new(),
-                                        tokens: None,
-                                    },
-                                );
-                            }
+                            self.emit_text(&mut first_message, to_yield);
                             break;
                         }
                     }
 
                     let to_yield = self.buffer.clone();
                     self.buffer.clear();
-                    if let Some(text) = reject_empty(to_yield) {
-                        self.emit_message(
-                            &mut first_message,
-                            AssistantMessage {
-                                name: None,
-                                text: Some(TextContent {
-                                    text: Some(text),
-                                    thinking: None,
-                                    refusal: None,
-                                }),
-                                tools: Vec::new(),
-                                tokens: None,
-                            },
-                        );
-                    }
+                    self.emit_text(&mut first_message, to_yield);
                     break;
                 }
             } else if let Some(pos) = self.buffer.find("</think>") {
@@ -284,42 +278,14 @@ where
                     if "</think>".starts_with(remaining) {
                         let to_yield = self.buffer[..last_lt].to_string();
                         self.buffer.drain(..last_lt);
-                        if let Some(thinking) = reject_empty(to_yield) {
-                            self.emit_message(
-                                &mut first_message,
-                                AssistantMessage {
-                                    name: None,
-                                    text: Some(TextContent {
-                                        text: None,
-                                        thinking: Some(thinking),
-                                        refusal: None,
-                                    }),
-                                    tools: Vec::new(),
-                                    tokens: None,
-                                },
-                            );
-                        }
+                        self.emit_thinking(&mut first_message, to_yield);
                         break;
                     }
                 }
 
                 let to_yield = self.buffer.clone();
                 self.buffer.clear();
-                if let Some(thinking) = reject_empty(to_yield) {
-                    self.emit_message(
-                        &mut first_message,
-                        AssistantMessage {
-                            name: None,
-                            text: Some(TextContent {
-                                text: None,
-                                thinking: Some(thinking),
-                                refusal: None,
-                            }),
-                            tools: Vec::new(),
-                            tokens: None,
-                        },
-                    );
-                }
+                self.emit_thinking(&mut first_message, to_yield);
                 break;
             }
         }
