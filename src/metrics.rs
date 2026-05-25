@@ -25,28 +25,21 @@ impl MetricsRecorder {
         }
     }
 
-    pub(crate) fn first_token(&self) {
+    fn record_elapsed_ms(&self, metric: &'static str) {
         // The precision loss is fine here, as we are only using it for metrics.
         // TODO use as_millis_f64() once it is stable
         #[allow(clippy::cast_precision_loss)]
-        metrics::histogram!(
-            "llm_time_to_first_token_ms",
-            "service" => self.service.clone(),
-            "model" => self.model.clone(),
-        )
-        .record(self.start_time.elapsed().as_millis() as f64);
+        let duration_ms = self.start_time.elapsed().as_millis() as f64;
+        metrics::histogram!(metric, "service" => self.service.clone(), "model" => self.model.clone())
+            .record(duration_ms);
+    }
+
+    pub(crate) fn first_token(&self) {
+        self.record_elapsed_ms("llm_time_to_first_token_ms");
     }
 
     pub(crate) fn last_token(&self) {
-        // The precision loss is fine here, as we are only using it for metrics.
-        // TODO use as_millis_f64() once it is stable
-        #[allow(clippy::cast_precision_loss)]
-        metrics::histogram!(
-            "llm_time_to_last_token_ms",
-            "service" => self.service.clone(),
-            "model" => self.model.clone(),
-        )
-        .record(self.start_time.elapsed().as_millis() as f64);
+        self.record_elapsed_ms("llm_time_to_last_token_ms");
     }
 }
 
