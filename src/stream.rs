@@ -148,15 +148,15 @@ where
             return Ok(None);
         };
 
+        #[cfg(feature = "metrics")]
         if self.state == ProcessedStreamState::WaitingForFirstToken
             && (first.delta.content.is_some() || first.delta.tool_calls.is_some())
         {
-            self.state = ProcessedStreamState::StreamingText;
-            #[cfg(feature = "metrics")]
             self.record_first_token();
         }
 
         if let Some(tool_calls) = first.delta.tool_calls {
+            self.state = ProcessedStreamState::StreamingText;
             let mut processed_tool_calls = Vec::new();
             for tc in tool_calls {
                 let tool_call = process_tool_call_chunk(self.previous_tool_call_id.clone(), tc)?;
@@ -188,6 +188,7 @@ where
                 },
             );
         } else if let Some(content) = first.delta.content {
+            self.state = ProcessedStreamState::StreamingText;
             first_message = self.process_content(content);
         }
 
