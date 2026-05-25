@@ -298,8 +298,8 @@ where
 #[cfg(test)]
 mod tests {
     use super::{ProcessedStream, process_stream};
+    use crate::config::CallConfig;
     use crate::metrics::MetricsRecorder;
-    use crate::types::CallConfig;
     use async_openai::types::chat::{ChatCompletionMessageToolCallChunk, CreateChatCompletionStreamResponse};
     use futures::{StreamExt, stream};
 

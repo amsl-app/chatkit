@@ -1,4 +1,4 @@
-use crate::types::CallConfig;
+use crate::config::CallConfig;
 
 #[cfg(feature = "metrics")]
 use std::borrow::Cow;

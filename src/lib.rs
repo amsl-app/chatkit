@@ -2,14 +2,16 @@ use crate::error::{ChatKitError, ToolCallError};
 use crate::messages::{AssistantMessage, Memory, TokenUsage, ToolContent};
 use crate::metrics::MetricsRecorder;
 use crate::tools::{ToolChoice, ToolSchema};
-use crate::types::{CallConfig, CallOptions, ChatKitResponse};
+use crate::types::{CallOptions, ChatKitResponse};
 
+use config::CallConfig;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use std::error::Error;
 use stream::{StreamResponse, process_stream};
 use tracing::instrument;
 
+mod config;
 pub mod error;
 pub mod messages;
 mod metrics;
