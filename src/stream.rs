@@ -7,7 +7,6 @@ use std::collections::VecDeque;
 use std::fmt;
 use std::ops::ControlFlow;
 use std::pin::Pin;
-use std::str::FromStr;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::sync::Mutex;
@@ -204,9 +203,7 @@ where
             self.state = ProcessedStreamState::StreamingText;
             let mut processed_tool_calls = Vec::new();
             for tc in tool_calls {
-                let tool_call = process_tool_call_chunk(self.previous_tool_call_id.clone(), tc)?;
-                self.previous_tool_call_id = Some(tool_call.id.clone());
-                processed_tool_calls.push(tool_call);
+                processed_tool_calls.push(self.process_tool_call_chunk(tc)?);
             }
 
             self.emit_message(AssistantMessage::tools(processed_tool_calls, tokens));
@@ -244,6 +241,34 @@ where
                 break;
             }
         }
+    }
+
+    fn process_tool_call_chunk(
+        &mut self,
+        value: async_openai::types::chat::ChatCompletionMessageToolCallChunk,
+    ) -> Result<ToolContent, ChatKitError> {
+        let async_openai::types::chat::ChatCompletionMessageToolCallChunk { id, function, .. } = value;
+        let function = function.ok_or(ChatKitError::EmptyResponse)?;
+        let async_openai::types::chat::FunctionCallStream { name, arguments } = function;
+        let name = name.ok_or(ChatKitError::EmptyResponse)?;
+        let arguments = arguments.ok_or(ChatKitError::EmptyResponse)?;
+
+        let (thinking, arguments) = extract_thinking(&arguments);
+        tracing::debug!(arguments = &arguments, "cleaned function call arguments");
+
+        let arguments = serde_json::from_str::<Value>(&arguments)?;
+
+        let id = id
+            .or_else(|| self.previous_tool_call_id.take())
+            .ok_or(ChatKitError::ToolCall(ToolCallError::MissingToolId))?;
+        self.previous_tool_call_id = Some(id.clone());
+
+        Ok(ToolContent {
+            id,
+            name,
+            thinking,
+            arguments,
+        })
     }
 }
 
@@ -296,40 +321,9 @@ where
     }
 }
 
-pub(crate) fn process_tool_call_chunk(
-    previous_id: Option<String>,
-    value: async_openai::types::chat::ChatCompletionMessageToolCallChunk,
-) -> Result<ToolContent, ChatKitError> {
-    let async_openai::types::chat::ChatCompletionMessageToolCallChunk { id, function, .. } = value;
-
-    if let Some(async_openai::types::chat::FunctionCallStream {
-        name: Some(name),
-        arguments: Some(arguments),
-    }) = function
-    {
-        let (thinking, arguments) = extract_thinking(&arguments);
-        tracing::debug!(arguments = &arguments, "cleaned function call arguments");
-
-        let arguments = Value::from_str(&arguments)?;
-
-        let id = id
-            .or(previous_id)
-            .ok_or(ChatKitError::ToolCall(ToolCallError::MissingToolId))?;
-
-        Ok(ToolContent {
-            id,
-            name,
-            thinking,
-            arguments,
-        })
-    } else {
-        Err(ChatKitError::EmptyResponse)
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{process_stream, process_tool_call_chunk};
+    use super::{ProcessedStream, process_stream};
     use async_openai::types::chat::{ChatCompletionMessageToolCallChunk, CreateChatCompletionStreamResponse};
     use futures::{StreamExt, stream};
     use tokio::time::Instant;
@@ -347,7 +341,9 @@ mod tests {
         }"#;
         let chunk: ChatCompletionMessageToolCallChunk = serde_json::from_str(json).unwrap();
 
-        let response = process_tool_call_chunk(None, chunk).unwrap();
+        let stream = stream::empty::<Result<CreateChatCompletionStreamResponse, async_openai::error::OpenAIError>>();
+        let mut processed = ProcessedStream::new(stream, Instant::now(), "test".to_string(), "test".into());
+        let response = processed.process_tool_call_chunk(chunk).unwrap();
         assert_eq!(response.name, "test_tool");
         assert_eq!(response.thinking, Some("streaming tool thoughts".to_string()));
         assert_eq!(response.arguments["arg"], "done");
