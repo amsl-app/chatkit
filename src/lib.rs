@@ -1,6 +1,6 @@
 use crate::error::{ChatKitError, ToolCallError};
 use crate::messages::{AssistantMessage, Memory, TokenUsage, ToolContent};
-use crate::metrics::MetricsRecorder;
+use crate::metrics::{MetricsRecorder, MetricsRecorderTrait};
 use crate::tools::{ToolChoice, ToolSchema};
 use crate::types::{CallOptions, ChatKitResponse};
 

@@ -1,6 +1,6 @@
 use crate::error::{ChatKitError, StreamingError, ToolCallError};
 use crate::messages::{AssistantMessage, TokenUsage, ToolContent};
-use crate::metrics::MetricsRecorder;
+use crate::metrics::{MetricsRecorder, MetricsRecorderTrait};
 use crate::utils::{extract_thinking, reject_empty};
 use futures::{Stream, StreamExt};
 use serde_json::Value;

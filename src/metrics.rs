@@ -12,6 +12,11 @@ pub(crate) struct MetricsRecorder {
     model: Cow<'static, str>,
 }
 
+pub(crate) trait MetricsRecorderTrait {
+    fn first_token(&self);
+    fn last_token(&self);
+}
+
 #[cfg(not(feature = "metrics"))]
 pub(crate) struct MetricsRecorder;
 
@@ -33,12 +38,15 @@ impl MetricsRecorder {
         metrics::histogram!(metric, "service" => self.service.clone(), "model" => self.model.clone())
             .record(duration_ms);
     }
+}
 
-    pub(crate) fn first_token(&self) {
+#[cfg(feature = "metrics")]
+impl MetricsRecorderTrait for MetricsRecorder {
+    fn first_token(&self) {
         self.record_elapsed_ms("llm_time_to_first_token_ms");
     }
 
-    pub(crate) fn last_token(&self) {
+    fn last_token(&self) {
         self.record_elapsed_ms("llm_time_to_last_token_ms");
     }
 }
@@ -48,8 +56,11 @@ impl MetricsRecorder {
     pub(crate) fn new(_config: &CallConfig, _model: &str) -> Self {
         Self
     }
+}
 
-    pub(crate) fn first_token(&self) {}
+#[cfg(not(feature = "metrics"))]
+impl MetricsRecorderTrait for MetricsRecorder {
+    fn first_token(&self) {}
 
-    pub(crate) fn last_token(&self) {}
+    fn last_token(&self) {}
 }
