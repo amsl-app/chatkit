@@ -1,6 +1,7 @@
 use crate::error::{ChatKitError, StreamingError, ToolCallError};
 use crate::messages::{AssistantMessage, TokenUsage, ToolContent};
 use crate::metrics::MetricsRecorder;
+use crate::utils::{extract_thinking, reject_empty};
 use futures::{Stream, StreamExt};
 use serde_json::Value;
 use std::collections::VecDeque;
@@ -10,7 +11,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::sync::Mutex;
-use crate::utils::{extract_thinking, reject_empty};
 
 pub(crate) type BoxedStream = Pin<Box<dyn Stream<Item = Result<AssistantMessage, StreamingError>> + Send>>;
 
@@ -217,7 +217,7 @@ where
     fn process_tool_call_chunk(&mut self, value: ToolCallChunk) -> Result<ToolContent, ChatKitError> {
         let (id, name, arguments) = tool_call_parts(value)?;
 
-        let (thinking, arguments) = extract_thinking(&arguments);
+        let (thinking, arguments) = extract_thinking(arguments);
         tracing::debug!(arguments = &arguments, "cleaned function call arguments");
 
         let arguments = serde_json::from_str::<Value>(&arguments)?;
@@ -298,11 +298,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{process_stream, ProcessedStream};
+    use super::{ProcessedStream, process_stream};
     use crate::config::CallConfig;
     use crate::metrics::MetricsRecorder;
     use async_openai::types::chat::{ChatCompletionMessageToolCallChunk, CreateChatCompletionStreamResponse};
-    use futures::{stream, StreamExt};
+    use futures::{StreamExt, stream};
 
     fn test_metrics() -> MetricsRecorder {
         let config = CallConfig::builder().build();

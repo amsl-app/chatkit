@@ -195,11 +195,11 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
         } else if let Some(refusal) = first.message.refusal {
             Ok(AssistantMessage::refusal(refusal, tokens))
         } else if let Some(content) = first.message.content {
-            let (thinking, text) = utils::extract_thinking(&content);
+            let content_len = content.len();
+            let (thinking, text) = utils::extract_thinking(content);
 
             let text = utils::reject_empty(text);
 
-            let content_len = content.len();
             let thinking_len = thinking.as_ref().map(String::len);
             let text_len = text.as_ref().map(String::len);
 
@@ -265,7 +265,7 @@ impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCall> for ToolC
     fn try_from(value: async_openai::types::chat::ChatCompletionMessageToolCall) -> Result<Self, Self::Error> {
         let async_openai::types::chat::ChatCompletionMessageToolCall { id, function } = value;
         let async_openai::types::chat::FunctionCall { name, arguments } = function;
-        let (thinking, arguments) = utils::extract_thinking(&arguments);
+        let (thinking, arguments) = utils::extract_thinking(arguments);
         let arguments_len = arguments.len();
         let arguments = Value::from_str(&arguments)?;
         let argument_keys: Vec<&str> = match &arguments {
