@@ -213,29 +213,29 @@ where
             self.emit_message(AssistantMessage::refusal(refusal, tokens));
         } else if let Some(content) = first.delta.content {
             self.state = ProcessedStreamState::StreamingText;
-            self.process_content(content);
+            self.process_content(&content);
         }
 
         Ok(())
     }
 
-    fn process_content(&mut self, content: String) {
+    fn process_content(&mut self, content: &str) {
         self.buffer.push_str(&content);
 
         loop {
-            let control_flow = if self.state != ProcessedStreamState::StreamingThinking {
-                self.process_until_tag(
-                    THINK_OPEN_TAG,
-                    ProcessedStreamState::StreamingThinking,
-                    Self::emit_text,
-                    Self::emit_text,
-                )
-            } else {
+            let control_flow = if self.state == ProcessedStreamState::StreamingThinking {
                 self.process_until_tag(
                     THINK_CLOSE_TAG,
                     ProcessedStreamState::StreamingText,
                     Self::emit_thinking_boundary,
                     Self::emit_thinking,
+                )
+            } else {
+                self.process_until_tag(
+                    THINK_OPEN_TAG,
+                    ProcessedStreamState::StreamingThinking,
+                    Self::emit_text,
+                    Self::emit_text,
                 )
             };
 
