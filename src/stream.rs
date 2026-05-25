@@ -17,6 +17,8 @@ type BoxedStream = Pin<Box<dyn Stream<Item = Result<AssistantMessage, StreamingE
 const THINK_OPEN_TAG: &str = "<think>";
 const THINK_CLOSE_TAG: &str = "</think>";
 
+type ToolCallChunk = async_openai::types::chat::ChatCompletionMessageToolCallChunk;
+
 /// Clonable handle to a streaming LLM response; the inner stream is shared via `Arc<Mutex>`.
 pub struct StreamResponse(Arc<Mutex<BoxedStream>>);
 
@@ -243,15 +245,8 @@ where
         }
     }
 
-    fn process_tool_call_chunk(
-        &mut self,
-        value: async_openai::types::chat::ChatCompletionMessageToolCallChunk,
-    ) -> Result<ToolContent, ChatKitError> {
-        let async_openai::types::chat::ChatCompletionMessageToolCallChunk { id, function, .. } = value;
-        let function = function.ok_or(ChatKitError::EmptyResponse)?;
-        let async_openai::types::chat::FunctionCallStream { name, arguments } = function;
-        let name = name.ok_or(ChatKitError::EmptyResponse)?;
-        let arguments = arguments.ok_or(ChatKitError::EmptyResponse)?;
+    fn process_tool_call_chunk(&mut self, value: ToolCallChunk) -> Result<ToolContent, ChatKitError> {
+        let (id, name, arguments) = tool_call_parts(value)?;
 
         let (thinking, arguments) = extract_thinking(&arguments);
         tracing::debug!(arguments = &arguments, "cleaned function call arguments");
@@ -270,6 +265,18 @@ where
             arguments,
         })
     }
+}
+
+fn tool_call_parts(value: ToolCallChunk) -> Result<(Option<String>, String, String), ChatKitError> {
+    let ToolCallChunk { id, function, .. } = value;
+    let function = function.ok_or(ChatKitError::EmptyResponse)?;
+    let async_openai::types::chat::FunctionCallStream { name, arguments } = function;
+
+    Ok((
+        id,
+        name.ok_or(ChatKitError::EmptyResponse)?,
+        arguments.ok_or(ChatKitError::EmptyResponse)?,
+    ))
 }
 
 impl<S> Stream for ProcessedStream<S>
