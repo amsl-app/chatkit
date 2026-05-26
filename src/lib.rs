@@ -1,16 +1,21 @@
 use crate::error::{ChatKitError, ToolCallError};
 use crate::messages::{AssistantMessage, Memory, TokenUsage, ToolContent};
+use crate::metrics::{MetricsRecorder, MetricsRecorderTrait};
 use crate::tools::{ToolChoice, ToolSchema};
-use crate::types::{CallConfig, CallOptions, ChatKitResponse, StreamResponse, process_stream};
+use crate::types::{CallOptions, ChatKitResponse};
 
+use config::CallConfig;
 use schemars::JsonSchema;
 use serde::de::DeserializeOwned;
 use std::error::Error;
-use tokio::time::Instant;
+use stream::{StreamResponse, process_stream};
 use tracing::instrument;
 
+mod config;
 pub mod error;
 pub mod messages;
+mod metrics;
+mod stream;
 pub mod tools;
 pub mod types;
 mod utils;
@@ -31,9 +36,7 @@ pub async fn llm_call(
         streaming,
     } = options;
 
-    let start_time = Instant::now();
-
-    let service = config.api_base.clone();
+    let metrics = MetricsRecorder::new(&config, &model);
 
     let mut request = async_openai::types::chat::CreateChatCompletionRequestArgs::default();
     let messages: Vec<async_openai::types::chat::ChatCompletionRequestMessage> = memory.try_into()?;
@@ -95,7 +98,7 @@ pub async fn llm_call(
         let res = client.chat().create_stream(request).await;
         match res {
             Ok(stream) => {
-                let stream = process_stream(stream, start_time, service, model.into());
+                let stream = process_stream(stream, metrics);
                 Ok(ChatKitResponse::Stream(StreamResponse::new(stream)))
             }
             Err(error) => Err(ChatKitError::Api(error)),
@@ -104,19 +107,7 @@ pub async fn llm_call(
         let res: Result<async_openai::types::chat::CreateChatCompletionResponse, async_openai::error::OpenAIError> =
             client.chat().create(request).await;
 
-        #[cfg(feature = "metrics")]
-        {
-            // The precision loss is fine here, as we are only using it for metrics.
-            // TODO use as_millis_f64() once it is stable
-            #[allow(clippy::cast_precision_loss)]
-            let elapsed = start_time.elapsed().as_millis() as f64;
-            metrics::histogram!(
-                "llm_time_to_last_token_ms",
-                "service" => service,
-                "model" => model,
-            )
-            .record(elapsed);
-        }
+        metrics.last_token();
 
         tracing::debug!(?res, "received LLM response");
         let chat_completion = res.inspect_err(|error| {

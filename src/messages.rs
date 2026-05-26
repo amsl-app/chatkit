@@ -5,19 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::ChatKitError;
-use crate::utils::THINKING_RE;
+use crate::utils;
 
-pub(crate) fn reject_empty(data: String) -> Option<String> {
-    if data.is_empty() { None } else { Some(data) }
-}
-
-pub(crate) fn extract_thinking(s: &str) -> (Option<String>, String) {
-    let thinking = THINKING_RE
-        .captures(s)
-        .and_then(|caps| caps.get(1).map(|m| m.as_str().to_string()));
-    let cleaned = THINKING_RE.replace_all(s, "").to_string();
-    (thinking, cleaned)
-}
 /// System Message
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -68,6 +57,45 @@ pub struct AssistantMessage {
 }
 
 impl AssistantMessage {
+    pub(crate) fn tools(tools: Vec<ToolContent>, tokens: Option<TokenUsage>) -> Self {
+        Self {
+            name: None,
+            text: None,
+            tools,
+            tokens,
+        }
+    }
+
+    pub(crate) fn refusal(refusal: String, tokens: Option<TokenUsage>) -> Self {
+        Self::text_content(None, None, Some(refusal), tokens)
+    }
+
+    pub(crate) fn text(text: String) -> Self {
+        Self::text_content(Some(text), None, None, None)
+    }
+
+    pub(crate) fn thinking(thinking: Option<String>) -> Self {
+        Self::text_content(None, thinking, None, None)
+    }
+
+    pub(crate) fn text_content(
+        text: Option<String>,
+        thinking: Option<String>,
+        refusal: Option<String>,
+        tokens: Option<TokenUsage>,
+    ) -> Self {
+        Self {
+            name: None,
+            text: Some(TextContent {
+                text,
+                thinking,
+                refusal,
+            }),
+            tools: Vec::new(),
+            tokens,
+        }
+    }
+
     /// Extracts the `TextContent` from the current instance, if available.
     ///
     /// # Errors
@@ -163,29 +191,15 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
                 .map(TryInto::try_into)
                 .collect::<Result<_, _>>()?;
 
-            Ok(AssistantMessage {
-                name: None,
-                text: None,
-                tools: tool_calls,
-                tokens,
-            })
+            Ok(AssistantMessage::tools(tool_calls, tokens))
         } else if let Some(refusal) = first.message.refusal {
-            Ok(AssistantMessage {
-                name: None,
-                text: Some(TextContent {
-                    text: None,
-                    thinking: None,
-                    refusal: Some(refusal),
-                }),
-                tools: Vec::new(),
-                tokens,
-            })
+            Ok(AssistantMessage::refusal(refusal, tokens))
         } else if let Some(content) = first.message.content {
-            let (thinking, text) = extract_thinking(&content);
-
-            let text = reject_empty(text);
-
             let content_len = content.len();
+            let (thinking, text) = utils::extract_thinking(content);
+
+            let text = utils::reject_empty(text);
+
             let thinking_len = thinking.as_ref().map(String::len);
             let text_len = text.as_ref().map(String::len);
 
@@ -197,16 +211,7 @@ impl TryFrom<async_openai::types::chat::CreateChatCompletionResponse> for Assist
                 text_len,
                 "cleaned message content"
             );
-            Ok(AssistantMessage {
-                name: None,
-                text: Some(TextContent {
-                    text,
-                    thinking,
-                    refusal: None,
-                }),
-                tools: Vec::new(),
-                tokens,
-            })
+            Ok(AssistantMessage::text_content(text, thinking, None, tokens))
         } else {
             Err(ChatKitError::EmptyResponse)
         }
@@ -260,7 +265,7 @@ impl TryFrom<async_openai::types::chat::ChatCompletionMessageToolCall> for ToolC
     fn try_from(value: async_openai::types::chat::ChatCompletionMessageToolCall) -> Result<Self, Self::Error> {
         let async_openai::types::chat::ChatCompletionMessageToolCall { id, function } = value;
         let async_openai::types::chat::FunctionCall { name, arguments } = function;
-        let (thinking, arguments) = extract_thinking(&arguments);
+        let (thinking, arguments) = utils::extract_thinking(arguments);
         let arguments_len = arguments.len();
         let arguments = Value::from_str(&arguments)?;
         let argument_keys: Vec<&str> = match &arguments {
