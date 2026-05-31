@@ -203,7 +203,7 @@ mod tests {
         // This will then be a valid schema, but it's missing the title.
         schema.remove("title");
         let schema = ToolSchema(schema);
-        assert!(matches!(schema.name(), None), "Expected None for missing title");
+        core::assert_matches!(schema.name(), None);
     }
 
     #[test]
