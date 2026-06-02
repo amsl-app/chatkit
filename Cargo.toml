@@ -6,6 +6,7 @@ description = "Thin async Rust wrapper around any OpenAI-compatible chat API wit
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/amsl-app/chatkit"
 authors = ["Sven Scheu", "Linus Bierhoff"]
+rust-version = "1.96.0"
 
 [features]
 metrics = ["dep:metrics"]
