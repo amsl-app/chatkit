@@ -13,7 +13,7 @@ metrics = ["dep:metrics"]
 
 [dependencies]
 metrics = { version = "0.24", optional = true }
-async-openai = { version = "0.40.2", features = [
+async-openai = { version = "0.41.0", features = [
     "chat-completion",
     "middleware",
 ] }
